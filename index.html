@@ -1,0 +1,1423 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>lovely money &#9825; a shared tracker for two</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ctext x='16' y='24' font-size='24' text-anchor='middle'%3E%F0%9F%A7%B8%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;0,9..144,700;0,9..144,800;0,9..144,900;1,9..144,600;1,9..144,700&family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<script>
+/* ── instant session check, runs before paint to stop nav/dashboard flicker ── */
+(function(){
+  try{
+    var s = JSON.parse(localStorage.getItem('lovemoney_session_v2'));
+    if (s && s.user) document.documentElement.classList.add('lm-authed');
+  }catch(e){}
+})();
+</script>
+<style>
+/* ====================================================================
+   TOKENS
+==================================================================== */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;-webkit-tap-highlight-color:transparent}
+html,body{background:#0b0613}
+
+:root{
+  --void:#0b0613;
+  --surface:#150a1f;
+  --card:#190c24;
+  --card-hover:#23112f;
+  --line:rgba(255,143,179,.10);
+  --line-2:rgba(255,143,179,.20);
+
+  --cream:#fff6f9;
+  --text:#fbeef3;
+  --text-2:#e3c2d3;
+  --muted:#9d7e96;
+
+  --blush:#ff8fb3;
+  --blush-deep:#e0578f;
+  --crimson:#fb4570;
+  --crimson-deep:#b91f4e;
+  --honey:#ffc35c;
+  --honey-deep:#e29b2e;
+  --mint:#4fe0b8;
+  --mint-deep:#1fae8c;
+
+  --r-sm:10px;
+  --r-md:16px;
+  --r-lg:24px;
+  --r-xl:32px;
+
+  --s1:4px;--s2:8px;--s3:12px;--s4:16px;--s5:20px;--s6:28px;--s7:40px;--s8:56px;--s9:80px;--s10:112px;
+
+  --maxw:1180px;
+  --shadow-card:0 10px 40px rgba(0,0,0,.35);
+  --shadow-lift:0 20px 60px rgba(0,0,0,.45);
+  --ease:cubic-bezier(.16,1,.3,1);
+}
+
+body{
+  font-family:'Inter',system-ui,-apple-system,sans-serif;
+  color:var(--text);
+  overflow-x:hidden;
+  background:var(--void);
+  background-image:
+    radial-gradient(ellipse 70% 40% at 12% 18%, rgba(255,143,179,.06) 0%, transparent 100%),
+    radial-gradient(ellipse 70% 40% at 88% 82%, rgba(251,69,112,.05) 0%, transparent 100%),
+    radial-gradient(ellipse 50% 30% at 70% 10%, rgba(255,195,92,.04) 0%, transparent 100%);
+  line-height:1.5;
+}
+
+h1,h2,h3,h4{font-family:'Fraunces',serif;letter-spacing:-.01em}
+
+a{color:inherit}
+button{font-family:inherit}
+img,svg{display:block;max-width:100%}
+
+::selection{background:rgba(255,143,179,.25);color:#fff}
+
+:focus-visible{outline:2px solid var(--blush);outline-offset:3px;border-radius:6px}
+
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{animation-duration:.001ms !important;animation-iteration-count:1 !important;transition-duration:.001ms !important;scroll-behavior:auto !important}
+}
+
+/* ====================================================================
+   AMBIENT BACKDROPS
+==================================================================== */
+.orbs{position:fixed;inset:0;pointer-events:none;z-index:0;overflow:hidden}
+.orbs div{position:absolute;border-radius:50%;filter:blur(150px);opacity:.05;animation:orbDrift 26s infinite alternate ease-in-out}
+.orbs div:nth-child(1){width:620px;height:620px;background:var(--blush);top:-18%;left:-12%}
+.orbs div:nth-child(2){width:520px;height:520px;background:var(--crimson);bottom:-20%;right:-12%;animation-delay:-9s}
+.orbs div:nth-child(3){width:340px;height:340px;background:var(--honey);top:42%;left:62%;animation-delay:-16s;opacity:.035}
+@keyframes orbDrift{0%{transform:translate(0,0) scale(1)}100%{transform:translate(50px,-36px) scale(1.18)}}
+
+.grid-bg{
+  position:fixed;inset:0;pointer-events:none;z-index:0;
+  background-image:linear-gradient(rgba(255,143,179,.025) 1px,transparent 1px),linear-gradient(90deg,rgba(255,143,179,.025) 1px,transparent 1px);
+  background-size:54px 54px;
+  mask-image:radial-gradient(ellipse at 50% 35%,black 15%,transparent 68%);
+  -webkit-mask-image:radial-gradient(ellipse at 50% 35%,black 15%,transparent 68%);
+}
+
+.floaters{position:fixed;inset:0;pointer-events:none;z-index:0;overflow:hidden}
+.floaters span{position:absolute;opacity:0;user-select:none;will-change:transform,opacity;animation:floatUp linear infinite}
+@keyframes floatUp{
+  0%{opacity:0;transform:translateY(104vh) translateX(0) rotate(0deg) scale(.6)}
+  10%{opacity:.5}
+  55%{transform:translateY(48vh) translateX(var(--drift,16px)) rotate(180deg) scale(1)}
+  88%{opacity:.3}
+  100%{opacity:0;transform:translateY(-10vh) translateX(0) rotate(360deg) scale(1.05)}
+}
+
+/* ====================================================================
+   TOAST
+==================================================================== */
+.tc{position:fixed;bottom:28px;left:50%;transform:translateX(-50%);z-index:400;display:flex;flex-direction:column;gap:8px;align-items:center;pointer-events:none}
+.toast{
+  padding:12px 24px;border-radius:14px;
+  background:rgba(21,10,31,.94);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+  border:1px solid var(--line-2);color:var(--text);font-weight:600;font-size:.84rem;
+  display:flex;align-items:center;gap:8px;
+  box-shadow:var(--shadow-lift);
+  animation:tIn .45s var(--ease)
+}
+.toast.out{animation:tOut .35s forwards}
+@keyframes tIn{0%{opacity:0;transform:translateY(16px) scale(.92)}100%{opacity:1;transform:translateY(0) scale(1)}}
+@keyframes tOut{to{opacity:0;transform:translateY(16px) scale(.92)}}
+.toast.err{border-color:rgba(251,69,112,.35)}
+
+/* ====================================================================
+   NAVBAR
+==================================================================== */
+nav{position:fixed;top:0;left:0;right:0;z-index:90;background:rgba(11,6,19,.66);backdrop-filter:blur(22px);-webkit-backdrop-filter:blur(22px);border-bottom:1px solid var(--line);transition:background .3s,border-color .3s}
+nav.scrolled{background:rgba(11,6,19,.88);border-color:var(--line-2)}
+nav .inner{max-width:var(--maxw);margin:0 auto;padding:0 var(--s5);display:flex;align-items:center;justify-content:space-between;height:68px;gap:var(--s4)}
+
+.nav-logo{display:flex;align-items:center;gap:10px;text-decoration:none;color:var(--text);font-weight:800;font-size:1.08rem;letter-spacing:-.01em;font-family:'Fraunces',serif;white-space:nowrap}
+.nav-logo .heart-icon{
+  width:34px;height:34px;border-radius:11px;flex-shrink:0;
+  background:linear-gradient(135deg,var(--crimson),var(--blush-deep));
+  display:flex;align-items:center;justify-content:center;font-size:1.05rem;
+  box-shadow:0 0 22px rgba(251,69,112,.25);animation:logoBeat 2.6s ease-in-out infinite
+}
+@keyframes logoBeat{0%,100%{transform:scale(1)}15%{transform:scale(1.1)}30%{transform:scale(1)}45%{transform:scale(1.06)}}
+
+.nav-links{display:flex;align-items:center;gap:6px;list-style:none;position:relative}
+.nav-links a{
+  text-decoration:none;color:var(--text-2);font-size:.84rem;font-weight:600;
+  padding:8px 14px;border-radius:20px;transition:color .25s,background .25s;letter-spacing:.01em;
+  position:relative;display:inline-block;
+}
+.nav-links a:hover{color:#fff;background:rgba(255,143,179,.07)}
+.nav-links a.is-active{color:#fff;background:rgba(255,143,179,.1)}
+
+.nav-cta{
+  padding:11px 22px;border:none;border-radius:var(--r-sm);
+  background:linear-gradient(135deg,var(--crimson),var(--blush-deep));
+  color:#fff;font-size:.82rem;font-weight:700;cursor:pointer;
+  transition:transform .25s var(--ease),box-shadow .3s,filter .3s;
+  box-shadow:0 4px 22px rgba(251,69,112,.22);
+}
+.nav-cta:hover{transform:translateY(-2px);box-shadow:0 10px 30px rgba(251,69,112,.32);filter:brightness(1.06)}
+html.lm-authed .nav-cta{display:none}
+
+.nav-profile{display:none;align-items:center;gap:10px}
+html.lm-authed .nav-profile{display:flex}
+.nav-profile .av{
+  width:36px;height:36px;border-radius:11px;flex-shrink:0;
+  background:linear-gradient(135deg,var(--honey),var(--crimson));
+  display:flex;align-items:center;justify-content:center;font-size:1.05rem;
+  box-shadow:0 0 0 1px rgba(255,143,179,.15);
+}
+.nav-profile .who{display:flex;flex-direction:column;line-height:1.15}
+.nav-profile .nm{font-size:.82rem;font-weight:700;color:var(--text)}
+.nav-profile .role{font-size:.62rem;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.07em}
+.nav-profile .lo{
+  padding:8px 16px;border-radius:var(--r-sm);border:1px solid var(--line-2);
+  background:transparent;color:var(--text-2);font-size:.74rem;font-weight:700;
+  cursor:pointer;transition:all .25s;
+}
+.nav-profile .lo:hover{background:var(--card);color:#fff;border-color:rgba(255,143,179,.35)}
+
+.nav-burger{display:none;flex-direction:column;justify-content:center;gap:5px;width:38px;height:38px;border:1px solid var(--line-2);border-radius:10px;background:transparent;cursor:pointer}
+.nav-burger span{display:block;width:16px;height:2px;background:var(--text);margin:0 auto;border-radius:2px;transition:transform .3s,opacity .3s}
+.nav-burger.open span:nth-child(1){transform:translateY(7px) rotate(45deg)}
+.nav-burger.open span:nth-child(2){opacity:0}
+.nav-burger.open span:nth-child(3){transform:translateY(-7px) rotate(-45deg)}
+
+.mob-panel{
+  display:none;position:fixed;top:68px;left:0;right:0;z-index:85;
+  background:rgba(11,6,19,.97);backdrop-filter:blur(20px);
+  border-bottom:1px solid var(--line-2);
+  padding:var(--s4) var(--s5) var(--s6);
+  flex-direction:column;gap:6px;
+  transform:translateY(-12px);opacity:0;transition:transform .3s var(--ease),opacity .3s;
+}
+.mob-panel.show{display:flex;transform:translateY(0);opacity:1}
+.mob-panel a{padding:12px 6px;color:var(--text-2);text-decoration:none;font-weight:600;font-size:.92rem;border-bottom:1px solid var(--line)}
+.mob-panel .mob-cta{margin-top:6px}
+
+/* ====================================================================
+   BUTTONS
+==================================================================== */
+.btn{
+  position:relative;padding:15px 28px;border:none;border-radius:var(--r-sm);
+  font-size:.88rem;font-weight:700;cursor:pointer;font-family:inherit;
+  transition:transform .25s var(--ease),box-shadow .3s,filter .3s;overflow:hidden;
+  display:inline-flex;align-items:center;justify-content:center;gap:8px;
+}
+.btn:active{transform:scale(.97)}
+.btn-rose{background:linear-gradient(135deg,var(--crimson),var(--blush-deep));color:#fff;box-shadow:0 4px 26px rgba(251,69,112,.25)}
+.btn-rose:hover{transform:translateY(-2px);box-shadow:0 10px 36px rgba(251,69,112,.35);filter:brightness(1.06)}
+.btn-outline{background:transparent;color:var(--text);border:1.5px solid var(--line-2)}
+.btn-outline:hover{background:var(--card);border-color:rgba(255,143,179,.35);transform:translateY(-2px)}
+.ripple{position:absolute;border-radius:50%;background:rgba(255,255,255,.12);pointer-events:none;transform:scale(0);animation:rip .55s ease-out forwards}
+@keyframes rip{to{transform:scale(4.2);opacity:0}}
+
+/* ====================================================================
+   HERO
+==================================================================== */
+.hero{min-height:100vh;display:flex;align-items:center;padding:128px var(--s5) var(--s9);position:relative}
+.hero .inner{max-width:var(--maxw);margin:0 auto;display:grid;grid-template-columns:1.05fr .95fr;gap:var(--s9);align-items:center;width:100%}
+
+.hero-badge{display:inline-flex;align-items:center;gap:7px;padding:7px 18px;border-radius:30px;background:rgba(255,143,179,.07);border:1px solid var(--line-2);font-size:.76rem;font-weight:700;color:var(--blush);margin-bottom:var(--s5)}
+.hero-title{font-size:clamp(2.6rem,5vw,4.2rem);font-weight:800;line-height:1.04;letter-spacing:-.025em;margin-bottom:var(--s4)}
+.hero-title .hl{font-style:italic;font-weight:700;background:linear-gradient(135deg,var(--blush),var(--honey));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.hero-sub{font-size:1.05rem;color:var(--text-2);line-height:1.7;max-width:480px;margin-bottom:var(--s6)}
+.hero-sub b{color:var(--cream);font-weight:700}
+.hero-actions{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:var(--s7)}
+
+.hero-stats{display:flex;align-items:center;gap:var(--s7);padding-top:var(--s5);border-top:1px solid var(--line)}
+.hero-stat .n{font-size:1.5rem;font-weight:800;letter-spacing:-.02em;font-family:'Fraunces',serif}
+.hero-stat .l{font-size:.66rem;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-top:2px}
+
+/* hero visual / mascot */
+.hero-visual{position:relative;display:flex;align-items:center;justify-content:center}
+.hero-visual .glow-ring{position:absolute;width:100%;max-width:420px;aspect-ratio:1;border-radius:50%;background:radial-gradient(circle,rgba(255,143,179,.10) 0%,transparent 70%);filter:blur(6px)}
+.hero-mascot{width:100%;max-width:380px;position:relative;z-index:1;animation:mascotFloat 6s ease-in-out infinite}
+@keyframes mascotFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
+.mascot-bob{animation:bobGentle 3.4s ease-in-out infinite}
+@keyframes bobGentle{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
+.mascot-spark{animation:sparkPulse 2.6s ease-in-out infinite}
+@keyframes sparkPulse{0%,100%{opacity:.55;transform:scale(1)}50%{opacity:1;transform:scale(1.18)}}
+
+.float-chip{
+  position:absolute;display:flex;align-items:center;gap:6px;padding:9px 16px;border-radius:30px;
+  background:rgba(21,10,31,.85);backdrop-filter:blur(14px);border:1px solid var(--line-2);
+  font-size:.74rem;font-weight:700;color:var(--text);box-shadow:var(--shadow-card);
+  animation:chipFloat 5s ease-in-out infinite;white-space:nowrap;
+}
+.chip-1{top:6%;right:0;animation-delay:.2s}
+.chip-2{bottom:8%;left:-2%;animation-delay:1.1s}
+@keyframes chipFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+
+/* ====================================================================
+   SECTIONS / FEATURES / STEPS / CTA
+==================================================================== */
+.section{max-width:var(--maxw);margin:0 auto;padding:var(--s10) var(--s5)}
+.section-hdr{text-align:center;margin-bottom:var(--s8);max-width:560px;margin-inline:auto}
+.section-tg{display:inline-flex;align-items:center;gap:6px;padding:6px 16px;border-radius:30px;background:rgba(255,143,179,.07);border:1px solid var(--line-2);font-size:.72rem;font-weight:700;color:var(--blush);margin-bottom:var(--s4)}
+.section-hdr h2{font-size:clamp(1.9rem,3.4vw,2.6rem);font-weight:800;letter-spacing:-.025em;line-height:1.12;margin-bottom:var(--s3)}
+.section-hdr p{font-size:.95rem;color:var(--text-2);line-height:1.65}
+
+.features-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:var(--s4)}
+.feat-card{
+  background:var(--card);border:1px solid var(--line);border-radius:var(--r-lg);
+  padding:var(--s7) var(--s5);transition:all .35s var(--ease);position:relative;overflow:hidden;
+}
+.feat-card:hover{background:var(--card-hover);transform:translateY(-6px);border-color:var(--line-2);box-shadow:var(--shadow-lift)}
+.feat-card .fi{width:52px;height:52px;border-radius:15px;display:flex;align-items:center;justify-content:center;font-size:1.4rem;margin-bottom:var(--s5)}
+.feat-card:nth-child(1) .fi{background:rgba(255,143,179,.1);color:var(--blush)}
+.feat-card:nth-child(2) .fi{background:rgba(251,69,112,.1);color:var(--crimson)}
+.feat-card:nth-child(3) .fi{background:rgba(255,195,92,.1);color:var(--honey)}
+.feat-card:nth-child(4) .fi{background:rgba(79,224,184,.1);color:var(--mint)}
+.feat-card h3{font-size:1.06rem;font-weight:800;margin-bottom:var(--s2);letter-spacing:-.015em}
+.feat-card p{font-size:.83rem;color:var(--text-2);line-height:1.62}
+
+.steps-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:var(--s6)}
+.step{text-align:center;padding:0 var(--s2)}
+.step .sn{width:46px;height:46px;border-radius:50%;background:linear-gradient(135deg,var(--crimson),var(--blush-deep));display:flex;align-items:center;justify-content:center;font-size:1.4rem;margin:0 auto var(--s4);box-shadow:0 0 28px rgba(251,69,112,.18)}
+.step h4{font-size:1.02rem;font-weight:800;margin-bottom:var(--s2);letter-spacing:-.015em}
+.step p{font-size:.84rem;color:var(--text-2);line-height:1.6;max-width:250px;margin:0 auto}
+
+.cta-box{text-align:center;background:linear-gradient(135deg,rgba(255,143,179,.04),rgba(255,195,92,.03));border:1px solid var(--line-2);border-radius:var(--r-xl);padding:var(--s9) var(--s7);position:relative;overflow:hidden}
+.cta-box h2{font-size:clamp(1.6rem,3vw,2.1rem);font-weight:800;letter-spacing:-.025em;margin-bottom:var(--s2)}
+.cta-box p{font-size:.92rem;color:var(--text-2);margin-bottom:var(--s6)}
+
+/* fade-in on scroll */
+.reveal{opacity:0;transform:translateY(24px);transition:opacity .7s var(--ease),transform .7s var(--ease)}
+.reveal.in{opacity:1;transform:translateY(0)}
+
+/* ====================================================================
+   FOOTER
+==================================================================== */
+footer{border-top:1px solid var(--line);padding:var(--s8) var(--s5) var(--s6);position:relative;z-index:1}
+.footer-inner{max-width:var(--maxw);margin:0 auto;display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:var(--s7)}
+.footer-brand p{font-size:.82rem;color:var(--muted);line-height:1.6;margin-top:var(--s3);max-width:280px}
+.footer-col h5{font-size:.72rem;font-weight:800;color:var(--text);text-transform:uppercase;letter-spacing:.09em;margin-bottom:var(--s4)}
+.footer-col a{display:block;font-size:.82rem;color:var(--muted);text-decoration:none;margin-bottom:var(--s3);transition:color .25s}
+.footer-col a:hover{color:var(--blush)}
+.footer-btm{max-width:var(--maxw);margin:var(--s6) auto 0;padding-top:var(--s4);border-top:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;font-size:.78rem;color:var(--muted);flex-wrap:wrap;gap:8px}
+
+/* ====================================================================
+   AUTH OVERLAY
+==================================================================== */
+.auth-overlay{display:none;position:fixed;inset:0;z-index:200;background:rgba(7,3,12,.78);backdrop-filter:blur(28px);-webkit-backdrop-filter:blur(28px);align-items:center;justify-content:center;padding:var(--s4)}
+.auth-overlay.show{display:flex}
+.auth-modal{background:linear-gradient(160deg,#1c0f29,#0a0511);border:1px solid var(--line-2);border-radius:var(--r-xl);padding:var(--s8) var(--s6);width:100%;max-width:400px;position:relative;animation:authIn .5s var(--ease);box-shadow:0 26px 90px rgba(0,0,0,.6)}
+@keyframes authIn{0%{opacity:0;transform:scale(.93) translateY(20px)}100%{opacity:1;transform:scale(1) translateY(0)}}
+.auth-close{position:absolute;top:18px;right:18px;background:none;border:none;color:var(--muted);font-size:1.5rem;cursor:pointer;transition:color .3s;line-height:1}
+.auth-close:hover{color:var(--text)}
+.auth-hdr{text-align:center;margin-bottom:var(--s6)}
+.auth-hdr .ic{width:60px;height:60px;border-radius:18px;background:linear-gradient(135deg,var(--crimson),var(--blush-deep));display:flex;align-items:center;justify-content:center;font-size:1.6rem;margin:0 auto var(--s3);box-shadow:0 0 34px rgba(251,69,112,.2)}
+.auth-hdr h2{font-size:1.3rem;font-weight:800;letter-spacing:-.02em}
+.auth-hdr p{font-size:.8rem;color:var(--muted);margin-top:4px}
+.auth-form{display:flex;flex-direction:column;gap:var(--s3)}
+.auth-form .f{display:flex;flex-direction:column;gap:5px}
+.auth-form .f label{font-size:.66rem;font-weight:700;color:var(--text-2);text-transform:uppercase;letter-spacing:.07em}
+.auth-form .f input{padding:14px 16px;border-radius:var(--r-sm);border:1.5px solid var(--line-2);background:rgba(255,255,255,.03);color:var(--text);font-size:.88rem;outline:none;font-family:inherit;transition:border .3s,box-shadow .3s;font-weight:500}
+.auth-form .f input:focus{border-color:var(--blush);box-shadow:0 0 0 4px rgba(255,143,179,.08)}
+.auth-form .f input::placeholder{color:var(--muted);opacity:.5}
+.auth-err{color:var(--crimson);font-size:.76rem;text-align:center;min-height:1.4em;opacity:0;transition:opacity .3s;font-weight:600}
+.auth-err.show{opacity:1}
+.auth-hint{text-align:center;font-size:.68rem;color:var(--muted);margin-top:var(--s2);opacity:.6}
+
+/* ====================================================================
+   GENERIC MODAL
+==================================================================== */
+.modal-o{display:none;position:fixed;inset:0;z-index:250;background:rgba(7,3,12,.78);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);align-items:center;justify-content:center;padding:var(--s4)}
+.modal-o.show{display:flex}
+.modal-o .m{background:linear-gradient(160deg,#1c0f29,#0a0511);border:1px solid var(--line-2);border-radius:var(--r-xl);padding:var(--s6) var(--s5);width:100%;max-width:380px;animation:mS .4s var(--ease);box-shadow:0 26px 90px rgba(0,0,0,.55);max-height:88vh;overflow-y:auto}
+@keyframes mS{0%{opacity:0;transform:scale(.93) translateY(16px)}100%{opacity:1;transform:scale(1) translateY(0)}}
+.modal-o .m .mt{font-size:1.05rem;font-weight:800;margin-bottom:var(--s5);display:flex;align-items:center;gap:8px;letter-spacing:-.015em}
+.modal-o .m .fd{margin-bottom:var(--s3)}
+.modal-o .m label{display:flex;align-items:center;gap:3px;font-size:.65rem;color:var(--text-2);margin-bottom:5px;font-weight:700;text-transform:uppercase;letter-spacing:.08em}
+.modal-o .m input{width:100%;padding:13px 14px;border-radius:var(--r-sm);border:1.5px solid var(--line-2);background:rgba(255,255,255,.03);color:var(--text);font-size:.86rem;outline:none;font-family:inherit;transition:border .3s,box-shadow .3s;font-weight:500}
+.modal-o .m input:focus{border-color:var(--blush);box-shadow:0 0 0 4px rgba(255,143,179,.08)}
+.modal-o .m .ma{display:flex;gap:10px;margin-top:var(--s5)}
+.modal-o .m .ma .btn{flex:1;padding:13px;font-size:.82rem}
+.btn-ghost-m{background:rgba(255,255,255,.03);color:var(--text-2);border:1.5px solid var(--line-2);padding:13px;border-radius:var(--r-sm);font-size:.82rem;font-weight:700;cursor:pointer;transition:all .25s;font-family:inherit;display:inline-flex;align-items:center;justify-content:center;gap:6px}
+.btn-ghost-m:hover{background:rgba(255,255,255,.06);color:var(--text);transform:translateY(-2px);border-color:rgba(255,143,179,.3)}
+.btn-ghost-m.small{padding:9px 14px;font-size:.74rem;flex:none}
+.btn-ghost-m.danger{color:var(--crimson)}
+.btn-ghost-m.danger:hover{border-color:rgba(251,69,112,.4);background:rgba(251,69,112,.06)}
+
+/* ====================================================================
+   DASHBOARD
+==================================================================== */
+.dash-page{min-height:100vh;position:relative;z-index:1}
+html:not(.lm-authed) #landing{display:block}
+html.lm-authed #landing{display:none}
+html:not(.lm-authed) .dash-page{display:none}
+html.lm-authed .dash-page{display:block}
+
+.dash-body{max-width:540px;margin:0 auto;padding:100px var(--s4) var(--s8);display:flex;flex-direction:column;gap:var(--s4)}
+
+.dash-greet{display:flex;align-items:center;justify-content:space-between;padding:0 var(--s2)}
+.dash-greet h1{font-size:1.3rem;font-weight:800;letter-spacing:-.02em}
+.dash-greet .who-emoji{font-size:1.4rem}
+
+.bc{
+  background:linear-gradient(160deg,#1c0f29,#0a0511);
+  border-radius:var(--r-xl);padding:var(--s7) var(--s5) var(--s6);text-align:center;
+  position:relative;overflow:hidden;border:1px solid var(--line);
+  box-shadow:0 0 0 1px rgba(255,143,179,.03),0 10px 46px rgba(0,0,0,.4);
+}
+.bc .rot{position:absolute;top:-60%;left:-60%;width:220%;height:220%;background:conic-gradient(from 0deg,transparent,rgba(255,143,179,.04),transparent,rgba(255,195,92,.025),transparent);animation:rotS 18s linear infinite;pointer-events:none}
+@keyframes rotS{to{transform:rotate(360deg)}}
+.bc .sh{position:absolute;inset:0;background:radial-gradient(circle at 50% 0%,rgba(255,143,179,.05) 0%,transparent 60%);pointer-events:none}
+.bc .lbl{font-size:.65rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.12em;position:relative;display:flex;align-items:center;justify-content:center;gap:6px}
+.bc .num{font-size:3rem;font-weight:800;letter-spacing:-.035em;line-height:1.05;position:relative;margin:10px 0 6px;font-family:'Fraunces',serif;background:linear-gradient(135deg,var(--cream) 30%,rgba(255,255,255,.35));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;transition:transform .25s}
+.bc .num.pop{animation:popB .5s var(--ease)}
+@keyframes popB{0%{transform:scale(1)}35%{transform:scale(1.07)}100%{transform:scale(1)}}
+.bc .num .c{font-size:1.4rem;font-weight:500;-webkit-text-fill-color:var(--muted);opacity:.5}
+.bc .df{position:relative;display:inline-flex;align-items:center;gap:4px;font-size:.72rem;font-weight:700;padding:3px 14px;border-radius:30px;min-height:1.8em;opacity:0;transition:opacity .4s;background:rgba(255,255,255,.03);border:1px solid var(--line)}
+.bc .df.show{opacity:1}
+.bc .df.up{color:var(--mint);border-color:rgba(79,224,184,.2);background:rgba(79,224,184,.07)}
+.bc .df.down{color:var(--crimson);border-color:rgba(251,69,112,.2);background:rgba(251,69,112,.07)}
+.bc .together{margin-top:var(--s4);font-size:.7rem;color:var(--muted);display:flex;align-items:center;justify-content:center;gap:6px;position:relative}
+
+.st{display:grid;grid-template-columns:1fr 1fr 1fr;gap:var(--s2)}
+.st .c{background:var(--card);border:1px solid var(--line);border-radius:var(--r-lg);padding:var(--s4) var(--s2);text-align:center;transition:background .3s}
+.st .c:hover{background:var(--card-hover)}
+.st .c .v{font-size:1.02rem;font-weight:800;letter-spacing:-.02em}
+.st .c .l{font-size:.6rem;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-top:2px}
+.st .c:nth-child(1) .v{color:var(--mint)}
+.st .c:nth-child(2) .v{color:var(--crimson)}
+.st .c:nth-child(3) .v{color:var(--blush)}
+
+.ac{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:var(--s2)}
+.ac .ab{position:relative;background:var(--card);border:1px solid var(--line);border-radius:var(--r-lg);padding:var(--s4) var(--s2);text-align:center;cursor:pointer;font-family:inherit;transition:all .3s}
+.ac .ab:hover{background:var(--card-hover);transform:translateY(-3px);border-color:rgba(255,143,179,.25);box-shadow:0 10px 30px rgba(0,0,0,.3)}
+.ac .ab:active{transform:translateY(-1px)}
+.ac .ab .ai{font-size:1.25rem;display:block;margin-bottom:4px}
+.ac .ab .al{font-size:.62rem;font-weight:700;color:var(--text-2);text-transform:uppercase;letter-spacing:.05em}
+.ac .ab .ak{position:absolute;top:-5px;right:-5px;background:var(--void);border:1px solid var(--line-2);border-radius:5px;padding:0 5px;font-size:.48rem;font-weight:700;color:var(--muted);line-height:1.7}
+.ac .ab.love:hover .ai{filter:drop-shadow(0 0 6px rgba(255,143,179,.5))}
+.ac .ab.rose:hover .ai{filter:drop-shadow(0 0 6px rgba(251,69,112,.5))}
+.ac .ab.gold:hover .ai{filter:drop-shadow(0 0 6px rgba(255,195,92,.5))}
+
+.kh{display:flex;align-items:center;justify-content:center;gap:6px;font-size:.56rem;color:var(--muted);font-weight:500;opacity:.45}
+.kh kbd{background:var(--card);border:1px solid var(--line-2);border-radius:4px;padding:0 6px;font-family:inherit;font-size:.52rem;font-weight:700;color:var(--text-2);line-height:1.7}
+
+/* tabs */
+.seg{display:grid;grid-template-columns:1fr 1fr;background:var(--card);border:1px solid var(--line);border-radius:var(--r-lg);padding:4px;gap:4px}
+.seg-btn{background:transparent;border:none;border-radius:13px;padding:10px 8px;font-size:.78rem;font-weight:700;color:var(--text-2);cursor:pointer;font-family:inherit;transition:all .25s;display:flex;align-items:center;justify-content:center;gap:6px}
+.seg-btn.active{background:linear-gradient(135deg,var(--crimson),var(--blush-deep));color:#fff;box-shadow:0 4px 18px rgba(251,69,112,.25)}
+.tab-panel[hidden]{display:none}
+.tab-panel{display:flex;flex-direction:column;gap:var(--s4)}
+
+.txh{display:flex;align-items:center;justify-content:space-between}
+.txh .t{font-size:.66rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;display:flex;align-items:center;gap:5px}
+.txh .c{font-size:.58rem;color:var(--muted);font-weight:600;padding:2px 11px;border-radius:30px;background:var(--card);border:1px solid var(--line)}
+
+.txl{display:flex;flex-direction:column;gap:7px;max-height:340px;overflow-y:auto;padding-right:4px;scrollbar-width:thin;scrollbar-color:var(--line-2) transparent}
+.txl::-webkit-scrollbar{width:4px}
+.txl::-webkit-scrollbar-track{background:transparent}
+.txl::-webkit-scrollbar-thumb{background:var(--line-2);border-radius:4px}
+.tx{display:flex;align-items:center;gap:11px;background:var(--card);border:1px solid var(--line);border-radius:var(--r-lg);padding:13px 15px;animation:txIn .45s var(--ease);transition:all .25s;cursor:default}
+.tx:hover{background:var(--card-hover);border-color:rgba(255,143,179,.2);transform:translateX(3px)}
+@keyframes txIn{0%{opacity:0;transform:translateX(-14px)}100%{opacity:1;transform:translateX(0)}}
+.txi{width:36px;height:36px;border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:.95rem;flex-shrink:0;font-weight:700;border:1px solid transparent}
+.txi.p{border-color:rgba(79,224,184,.18);background:rgba(79,224,184,.09);color:var(--mint)}
+.txi.m{border-color:rgba(251,69,112,.18);background:rgba(251,69,112,.09);color:var(--crimson)}
+.txi.s{border-color:rgba(255,143,179,.18);background:rgba(255,143,179,.09);color:var(--blush)}
+.txif{flex:1;min-width:0}
+.txlb{font-weight:700;font-size:.83rem;letter-spacing:-.01em}
+.txby{font-size:.62rem;color:var(--muted);margin-top:1px;font-weight:600;display:flex;align-items:center;gap:4px}
+.txam{font-weight:800;font-size:.87rem;white-space:nowrap;letter-spacing:-.02em;font-family:'Fraunces',serif}
+.txam.p{color:var(--mint)}
+.txam.n{color:var(--crimson)}
+.txem{text-align:center;padding:var(--s8) 0;color:var(--muted);font-size:.8rem;font-weight:500}
+.txem .bi{font-size:2.1rem;display:block;margin-bottom:var(--s3);opacity:.5}
+
+/* logs toolbar + timeline */
+.logs-toolbar{display:flex;gap:8px}
+.logs-toolbar input{flex:1;padding:11px 14px;border-radius:var(--r-sm);border:1.5px solid var(--line-2);background:rgba(255,255,255,.03);color:var(--text);font-size:.8rem;outline:none;font-family:inherit}
+.logs-toolbar input:focus{border-color:var(--blush)}
+.logs-toolbar select{padding:11px 12px;border-radius:var(--r-sm);border:1.5px solid var(--line-2);background:#180b22;color:var(--text);font-size:.78rem;outline:none;font-family:inherit;cursor:pointer}
+.logs-actions{display:flex;gap:8px;justify-content:flex-end}
+
+.logs-timeline{display:flex;flex-direction:column;max-height:420px;overflow-y:auto;padding-right:4px;scrollbar-width:thin;scrollbar-color:var(--line-2) transparent}
+.logs-timeline::-webkit-scrollbar{width:4px}
+.logs-timeline::-webkit-scrollbar-thumb{background:var(--line-2);border-radius:4px}
+.log-row{display:flex;gap:12px;position:relative;padding-bottom:var(--s4)}
+.log-row:last-child{padding-bottom:0}
+.log-rail{display:flex;flex-direction:column;align-items:center;flex-shrink:0}
+.log-dot{width:11px;height:11px;border-radius:50%;margin-top:6px;flex-shrink:0;border:2px solid var(--void)}
+.log-dot.p{background:var(--mint);box-shadow:0 0 0 3px rgba(79,224,184,.15)}
+.log-dot.m{background:var(--crimson);box-shadow:0 0 0 3px rgba(251,69,112,.15)}
+.log-dot.s{background:var(--blush);box-shadow:0 0 0 3px rgba(255,143,179,.15)}
+.log-dot.r{background:var(--honey);box-shadow:0 0 0 3px rgba(255,195,92,.15)}
+.log-line{flex:1;width:2px;background:var(--line);margin-top:4px}
+.log-card{flex:1;background:var(--card);border:1px solid var(--line);border-radius:var(--r-md);padding:12px 14px;animation:txIn .4s var(--ease)}
+.log-top{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:4px}
+.log-action{font-size:.82rem;font-weight:800;letter-spacing:-.01em;display:flex;align-items:center;gap:6px}
+.log-time{font-size:.62rem;color:var(--muted);font-weight:600;white-space:nowrap}
+.log-meta{font-size:.74rem;color:var(--text-2);line-height:1.5}
+.log-bal{font-size:.68rem;color:var(--muted);margin-top:4px;font-weight:600}
+.log-status{display:inline-flex;align-items:center;gap:4px;font-size:.6rem;font-weight:700;color:var(--mint);background:rgba(79,224,184,.08);border:1px solid rgba(79,224,184,.18);padding:2px 9px;border-radius:30px;margin-top:6px}
+.logem{text-align:center;padding:var(--s8) 0;color:var(--muted);font-size:.8rem}
+.logem .bi{font-size:2.1rem;display:block;margin-bottom:var(--s3);opacity:.5}
+
+/* ====================================================================
+   RESPONSIVE
+==================================================================== */
+@media(max-width:1024px){
+  .hero .inner{grid-template-columns:1fr;text-align:center;gap:var(--s7)}
+  .hero-sub{margin-inline:auto}
+  .hero-actions{justify-content:center}
+  .hero-stats{justify-content:center}
+  .hero-visual{order:-1;max-width:340px;margin:0 auto}
+}
+@media(max-width:900px){
+  .features-grid{grid-template-columns:1fr 1fr}
+  .steps-grid{grid-template-columns:1fr 1fr}
+  .footer-inner{grid-template-columns:1fr 1fr}
+}
+@media(max-width:768px){
+  .nav-links{display:none}
+  .nav-burger{display:flex}
+}
+@media(max-width:640px){
+  .hero{padding-top:104px}
+  .hero-title{font-size:clamp(2.1rem,9vw,2.6rem)}
+  .hero-stats{gap:var(--s5);flex-wrap:wrap}
+  .section{padding:var(--s8) var(--s4)}
+  .section-hdr h2{font-size:1.6rem}
+  .features-grid,.steps-grid{grid-template-columns:1fr}
+  .footer-inner{grid-template-columns:1fr;gap:var(--s5)}
+  .footer-btm{flex-direction:column;text-align:center}
+  .bc .num{font-size:2.3rem}
+  .ac{grid-template-columns:1fr 1fr}
+  .cta-box{padding:var(--s7) var(--s4)}
+  .float-chip{font-size:.66rem;padding:7px 13px}
+}
+</style>
+</head>
+<body>
+
+<div class="orbs"><div></div><div></div><div></div></div>
+<div class="grid-bg"></div>
+<div class="floaters" id="floaters"></div>
+
+<div class="tc" id="tc"></div>
+
+<!-- MODAL -->
+<div class="modal-o" id="modalO">
+  <div class="m">
+    <div class="mt" id="mT">Title</div>
+    <div id="mB"></div>
+  </div>
+</div>
+
+<!-- NAVBAR -->
+<nav id="navbar">
+  <div class="inner">
+    <a href="#" class="nav-logo">
+      <span class="heart-icon">&#129700;</span> lovely money
+    </a>
+    <ul class="nav-links" id="navLinks">
+      <li><a href="#features" data-sec="features">Features</a></li>
+      <li><a href="#how" data-sec="how">How it Works</a></li>
+      <li><a href="#" onclick="openAuth();return false;">Sign In</a></li>
+    </ul>
+    <button class="nav-cta" onclick="openAuth()">Get Started</button>
+    <div class="nav-profile" id="navProfile">
+      <div class="av" id="navAv">&#129418;</div>
+      <div class="who"><span class="nm" id="navNm">Advik</span><span class="role">Shared wallet</span></div>
+      <button class="lo" id="logoutBtn">Sign Out</button>
+    </div>
+    <button class="nav-burger" id="navBurger" aria-label="Menu"><span></span><span></span><span></span></button>
+  </div>
+  <div class="mob-panel" id="mobPanel">
+    <a href="#features">Features</a>
+    <a href="#how">How it Works</a>
+    <button class="btn btn-rose mob-cta" id="mobAuthBtn">&#9825; Sign In</button>
+  </div>
+</nav>
+
+<!-- LANDING PAGE -->
+<main id="landing">
+
+  <section class="hero">
+    <div class="inner">
+      <div class="hero-content">
+        <div class="hero-badge">&#10022; Private &bull; Just for Two</div>
+        <h1 class="hero-title">Money tracking,<br>made with <span class="hl">love</span></h1>
+        <p class="hero-sub">A cozy shared tracker for <b>advik33</b> &amp; <b>anyacutie1</b>. One wallet, two hearts &mdash; every rupee in and out, watched over by a very dedicated panda and an equally dedicated teddy bear.</p>
+        <div class="hero-actions">
+          <button class="btn btn-rose" onclick="openAuth()">&#9825; Sign In</button>
+          <a href="#features" class="btn btn-outline">Explore &darr;</a>
+        </div>
+        <div class="hero-stats">
+          <div class="hero-stat"><div class="n">2</div><div class="l">Loved Users</div></div>
+          <div class="hero-stat"><div class="n" id="heroTxns">0</div><div class="l">Transactions</div></div>
+          <div class="hero-stat"><div class="n" id="heroBal">&#8377;0</div><div class="l">Saved Together</div></div>
+        </div>
+      </div>
+
+      <div class="hero-visual">
+        <div class="glow-ring"></div>
+        <svg class="hero-mascot" viewBox="0 0 400 380" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="A panda and a teddy bear sitting beside a shared coin pouch">
+          <defs>
+            <linearGradient id="pouchGrad" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stop-color="#ffb3cf"/>
+              <stop offset="100%" stop-color="#c2407e"/>
+            </linearGradient>
+            <radialGradient id="heroGlow" cx="50%" cy="42%" r="60%">
+              <stop offset="0%" stop-color="#ff8fb3" stop-opacity=".30"/>
+              <stop offset="100%" stop-color="#ff8fb3" stop-opacity="0"/>
+            </radialGradient>
+          </defs>
+
+          <circle cx="200" cy="190" r="172" fill="url(#heroGlow)"/>
+
+          <!-- sparkles & coins -->
+          <g class="mascot-spark" style="animation-delay:0s">
+            <text x="38" y="78" font-size="26" fill="#ffc35c">&#10038;</text>
+          </g>
+          <g class="mascot-spark" style="animation-delay:.6s">
+            <text x="338" y="64" font-size="20" fill="#ff8fb3">&#10039;</text>
+          </g>
+          <g class="mascot-spark" style="animation-delay:1.1s">
+            <text x="16" y="262" font-size="17" fill="#fff6f9">&#8902;</text>
+          </g>
+          <g class="mascot-spark" style="animation-delay:1.6s">
+            <text x="356" y="240" font-size="22" fill="#ffc35c">&#10038;</text>
+          </g>
+          <g class="mascot-spark" style="animation-delay:.3s">
+            <text x="292" y="338" font-size="20" fill="#fb4570" opacity=".85">&#9825;</text>
+          </g>
+
+          <g class="mascot-bob" style="animation-delay:.2s">
+            <circle cx="55" cy="194" r="19" fill="#ffc35c"/>
+            <text x="55" y="200" font-size="16" fill="#190c24" text-anchor="middle" font-weight="700">&#8377;</text>
+          </g>
+          <g class="mascot-bob" style="animation-delay:.7s">
+            <circle cx="347" cy="172" r="16" fill="#ff8fb3"/>
+            <text x="347" y="178" font-size="14" fill="#fff6f9" text-anchor="middle" font-weight="700">&#8377;</text>
+          </g>
+
+          <!-- pouch -->
+          <rect x="108" y="172" width="184" height="158" rx="72" ry="68" fill="url(#pouchGrad)" stroke="rgba(255,255,255,.25)" stroke-width="2"/>
+          <ellipse cx="200" cy="192" rx="78" ry="13" fill="rgba(0,0,0,.08)"/>
+          <path d="M126 180 Q200 144 274 180" stroke="#ffe3ef" stroke-width="9" fill="none" stroke-linecap="round"/>
+          <text x="200" y="190" font-size="30" fill="#fff6f9" text-anchor="middle">&#9825;</text>
+
+          <!-- panda peeking left -->
+          <g transform="translate(118,158)" class="mascot-bob" style="animation-delay:0s">
+            <circle cx="-34" cy="-34" r="18" fill="#1c1620"/>
+            <circle cx="34" cy="-34" r="18" fill="#1c1620"/>
+            <circle r="48" fill="#fdf7f2"/>
+            <ellipse cx="-17" cy="-2" rx="13" ry="17" fill="#1c1620"/>
+            <ellipse cx="17" cy="-2" rx="13" ry="17" fill="#1c1620"/>
+            <circle cx="-15" cy="-1" r="3.4" fill="#fdf7f2"/>
+            <circle cx="15" cy="-1" r="3.4" fill="#fdf7f2"/>
+            <ellipse cx="0" cy="18" rx="5.5" ry="4" fill="#1c1620"/>
+            <path d="M-9 25 Q0 32 9 25" stroke="#1c1620" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+            <circle cx="-30" cy="14" r="6" fill="#ffb6c9" opacity=".5"/>
+            <circle cx="30" cy="14" r="6" fill="#ffb6c9" opacity=".5"/>
+          </g>
+
+          <!-- teddy peeking right -->
+          <g transform="translate(282,158)" class="mascot-bob" style="animation-delay:.35s">
+            <circle cx="-33" cy="-35" r="20" fill="#caa06c"/>
+            <circle cx="-33" cy="-35" r="11" fill="#f1d3a3"/>
+            <circle cx="33" cy="-35" r="20" fill="#caa06c"/>
+            <circle cx="33" cy="-35" r="11" fill="#f1d3a3"/>
+            <circle r="48" fill="#caa06c"/>
+            <ellipse cx="0" cy="16" rx="26" ry="20" fill="#f1d3a3"/>
+            <circle cx="-16" cy="-4" r="4" fill="#2a1c12"/>
+            <circle cx="16" cy="-4" r="4" fill="#2a1c12"/>
+            <ellipse cx="0" cy="10" rx="7" ry="5" fill="#2a1c12"/>
+            <line x1="0" y1="15" x2="0" y2="21" stroke="#2a1c12" stroke-width="2" stroke-linecap="round"/>
+            <path d="M-8 25 Q0 31 8 25" stroke="#2a1c12" stroke-width="2" fill="none" stroke-linecap="round"/>
+            <polygon points="-20,46 -3,40 -3,52" fill="#ff8fb3"/>
+            <polygon points="20,46 3,40 3,52" fill="#ff8fb3"/>
+            <circle cx="0" cy="46" r="5" fill="#fb4570"/>
+          </g>
+        </svg>
+
+        <div class="float-chip chip-1">&#128156; Shared since 2026</div>
+        <div class="float-chip chip-2">&#128274; Private, just for two</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section reveal" id="features">
+    <div class="section-hdr">
+      <div class="section-tg">&#9825; Features</div>
+      <h2>Made with love</h2>
+      <p>Simple tools to manage your shared money, beautifully designed &mdash; and quietly backed up every step of the way.</p>
+    </div>
+    <div class="features-grid">
+      <div class="feat-card">
+        <div class="fi">+</div>
+        <h3>Add Money</h3>
+        <p>Record income instantly. Salary, gifts, cash &mdash; log it with a sweet note.</p>
+      </div>
+      <div class="feat-card">
+        <div class="fi">&minus;</div>
+        <h3>Cut Expenses</h3>
+        <p>Track every spend. Know where your money goes with cute descriptions.</p>
+      </div>
+      <div class="feat-card">
+        <div class="fi">&rarr;</div>
+        <h3>Pay Someone</h3>
+        <p>Log payments to anyone. Keep a clean record of who got what.</p>
+      </div>
+      <div class="feat-card">
+        <div class="fi">&#128193;</div>
+        <h3>Activity Backup</h3>
+        <p>Every change is timestamped, attributed, and saved &mdash; so nothing ever quietly disappears.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="section reveal" id="how">
+    <div class="section-hdr">
+      <div class="section-tg">&#9825; How it Works</div>
+      <h2>Three sweet steps</h2>
+      <p>Start tracking your shared money in seconds, from either of your accounts.</p>
+    </div>
+    <div class="steps-grid">
+      <div class="step">
+        <div class="sn">&#128273;</div>
+        <h4>Sign In</h4>
+        <p>Login with your private key, Advik or Anya. You both see the same wallet.</p>
+      </div>
+      <div class="step">
+        <div class="sn">&#128176;</div>
+        <h4>Track</h4>
+        <p>Add, cut, or pay. Every transaction saves instantly for both of you.</p>
+      </div>
+      <div class="step">
+        <div class="sn">&#128156;</div>
+        <h4>Stay in Love</h4>
+        <p>Check your balance, browse history, and review the full activity log anytime.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="section reveal" style="padding-top:0">
+    <div class="cta-box">
+      <h2>Ready to track with love?</h2>
+      <p>Private, beautiful, and made just for two &hearts;</p>
+      <button class="btn btn-rose" onclick="openAuth()">&#9825; Sign In Now</button>
+    </div>
+  </section>
+
+</main>
+
+<!-- DASHBOARD -->
+<div class="dash-page" id="dashPage">
+  <div class="dash-body">
+
+    <div class="dash-greet">
+      <h1 id="greetText">Hi, Advik &#128075;</h1>
+      <span class="who-emoji" id="greetEmoji">&#129418;</span>
+    </div>
+
+    <div class="bc">
+      <div class="rot"></div><div class="sh"></div>
+      <div class="lbl">&#9825; Shared Balance</div>
+      <div class="num" id="balDisplay"><span class="c">&#8377;</span><span id="balNum">0</span></div>
+      <div class="df" id="balDiff"></div>
+      <div class="together">&#129418;&#43;&#128060; tracked together, always in sync</div>
+    </div>
+
+    <div class="st">
+      <div class="c"><div class="v" id="statEarned">0</div><div class="l">Earned</div></div>
+      <div class="c"><div class="v" id="statSpent">0</div><div class="l">Spent</div></div>
+      <div class="c"><div class="v" id="statCount">0</div><div class="l">Entries</div></div>
+    </div>
+
+    <div class="ac">
+      <button class="ab love" id="actAdd"><span class="ak">1</span><span class="ai">+</span><span class="al">Add</span></button>
+      <button class="ab rose" id="actCut"><span class="ak">2</span><span class="ai">&minus;</span><span class="al">Cut</span></button>
+      <button class="ab gold" id="actPay"><span class="ak">3</span><span class="ai">&rarr;</span><span class="al">Pay</span></button>
+      <button class="ab" id="actReset"><span class="ai">&#8635;</span><span class="al">Reset</span></button>
+    </div>
+
+    <div class="kh"><kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> &hearts; quick keys</div>
+
+    <div class="seg" id="dashTabs">
+      <button class="seg-btn active" data-tab="overview">&#128156; Overview</button>
+      <button class="seg-btn" data-tab="logs">&#128193; Activity Log</button>
+    </div>
+
+    <div class="tab-panel" id="panelOverview">
+      <div class="txh">
+        <div class="t">&#128203; History</div>
+        <div class="c" id="txCount">0</div>
+      </div>
+      <div class="txl" id="txList">
+        <div class="txem"><span class="bi">&#128176;</span>No entries yet</div>
+      </div>
+    </div>
+
+    <div class="tab-panel" id="panelLogs" hidden>
+      <div class="logs-toolbar">
+        <input type="text" id="logSearch" placeholder="Search the backup log...">
+        <select id="logFilter">
+          <option value="all">All actions</option>
+          <option value="add">Added</option>
+          <option value="cut">Cut</option>
+          <option value="pay">Paid</option>
+          <option value="reset">Reset</option>
+        </select>
+      </div>
+      <div class="logs-actions">
+        <button class="btn-ghost-m small" id="logExport">&#11015; Export JSON</button>
+        <button class="btn-ghost-m small danger" id="logClear">&#128465; Clear Logs</button>
+      </div>
+      <div class="logs-timeline" id="logsTimeline">
+        <div class="logem"><span class="bi">&#128193;</span>No backup entries yet</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- FOOTER -->
+<footer>
+  <div class="footer-inner">
+    <div class="footer-brand">
+      <a href="#" class="nav-logo"><span class="heart-icon">&#129700;</span> lovely money</a>
+      <p>A private, shared money tracker made with love for advik33 &amp; anyacutie1.</p>
+    </div>
+    <div class="footer-col">
+      <h5>Product</h5>
+      <a href="#features">Features</a>
+      <a href="#how">How it Works</a>
+    </div>
+    <div class="footer-col">
+      <h5>Love</h5>
+      <a href="#">Privacy</a>
+      <a href="#">Safety</a>
+    </div>
+    <div class="footer-col">
+      <h5>Company</h5>
+      <a href="#">About Us</a>
+      <a href="#">Contact</a>
+    </div>
+  </div>
+  <div class="footer-btm">
+    <span>&copy; 2026 lovely money &hearts;</span>
+    <span>Made with infinite love for advik33 &amp; anyacutie1</span>
+  </div>
+</footer>
+
+<!-- AUTH OVERLAY -->
+<div class="auth-overlay" id="authOverlay">
+  <div class="auth-modal">
+    <button class="auth-close" onclick="closeAuth()">&times;</button>
+    <div class="auth-hdr">
+      <div class="ic">&#9825;</div>
+      <h2>Welcome back, love</h2>
+      <p>Sign in to continue tracking together</p>
+    </div>
+    <div class="auth-form">
+      <div class="f">
+        <label>Username</label>
+        <input type="text" id="authUser" placeholder="advik33 or anyacutie1" autocomplete="off" spellcheck="false">
+      </div>
+      <div class="f">
+        <label>Password</label>
+        <input type="password" id="authPass" placeholder="Your secret key" autocomplete="off">
+      </div>
+      <button class="btn btn-rose" id="authBtn">&#9825; Sign In</button>
+      <div class="auth-err" id="authErr">Wrong credentials, try again &hearts;</div>
+    </div>
+    <div class="auth-hint">Both accounts share one wallet &mdash; sign in as either of you.</div>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+/* ====================================================================
+   DATA MODEL
+   - One shared balance/transaction ledger for both accounts (DATA_KEY)
+   - One shared, append-only activity/backup log (LOG_KEY)
+   - A persisted session so refreshing the page doesn't sign you out
+==================================================================== */
+const USERS = {
+  advik33:    { pass:'advik@33',  name:'Advik', emoji:'\u{1F9F8}' }, // teddy
+  anyacutie1: { pass:'anya@cutie1', name:'Anya',  emoji:'\u{1F43C}' }  // panda
+};
+const DATA_KEY = 'lovemoney_shared_data_v2';
+const LOG_KEY  = 'lovemoney_shared_logs_v2';
+const SESSION_KEY = 'lovemoney_session_v2';
+
+let currentUser = null;
+let activeTab = 'overview';
+
+const DOM = {};
+function cacheDom(){
+  [
+    'balNum','balDisplay','balDiff','txList','txCount','statEarned','statSpent','statCount',
+    'heroTxns','heroBal','navAv','navNm','greetText','greetEmoji','logsTimeline'
+  ].forEach(id => DOM[id] = document.getElementById(id));
+}
+
+function genId(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+
+function now(){
+  return new Date().toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' });
+}
+
+/* ── storage helpers (shared between both accounts) ── */
+function loadData(){
+  try{
+    const raw = JSON.parse(localStorage.getItem(DATA_KEY));
+    if (raw && typeof raw.balance === 'number' && Array.isArray(raw.transactions)) return raw;
+  }catch(e){}
+  return { balance:0, transactions:[] };
+}
+function saveData(d){
+  try{ localStorage.setItem(DATA_KEY, JSON.stringify(d)); }catch(e){ toast('Could not save \u2014 storage full?', 3000, true); }
+}
+function loadLogs(){
+  try{
+    const raw = JSON.parse(localStorage.getItem(LOG_KEY));
+    if (Array.isArray(raw)) return raw;
+  }catch(e){}
+  return [];
+}
+function saveLogs(l){
+  try{ localStorage.setItem(LOG_KEY, JSON.stringify(l)); }catch(e){}
+}
+function addLog(entry){
+  const logs = loadLogs();
+  logs.push(entry);
+  saveLogs(logs);
+}
+
+/* ====================================================================
+   TOAST
+==================================================================== */
+function toast(msg, dur, isErr){
+  dur = dur || 2400;
+  const tc = document.getElementById('tc');
+  if (!tc) return;
+  const e = document.createElement('div');
+  e.className = 'toast' + (isErr ? ' err' : '');
+  e.textContent = msg;
+  tc.appendChild(e);
+  setTimeout(() => { e.classList.add('out'); setTimeout(() => e.remove(), 350); }, dur);
+}
+
+/* ====================================================================
+   AMBIENT DECORATIONS (hearts, sparkles, bows, pandas, teddies)
+==================================================================== */
+function initFloaters(){
+  const fc = document.getElementById('floaters');
+  if (!fc) return;
+  const glyphs = ['\u2661','\u2665','\u{1F49C}','\u{1F497}','\u{1F498}','\u2728','\u2606','\u{1F39D}\uFE0F','\u{1F43C}','\u{1F9F8}'];
+  const colors = ['rgba(255,143,179,.45)','rgba(251,69,112,.35)','rgba(255,195,92,.3)','rgba(255,246,249,.3)'];
+  const count = window.innerWidth < 640 ? 22 : 38;
+  for (let i = 0; i < count; i++){
+    const e = document.createElement('span');
+    e.textContent = glyphs[i % glyphs.length];
+    const isEmoji = i % glyphs.length >= 6;
+    e.style.left = Math.random() * 100 + '%';
+    e.style.setProperty('--drift', (Math.random() * 40 - 20) + 'px');
+    e.style.animationDelay = (Math.random() * 16) + 's';
+    e.style.animationDuration = (14 + Math.random() * 12) + 's';
+    e.style.fontSize = (isEmoji ? 14 + Math.random()*10 : 11 + Math.random()*15) + 'px';
+    if (!isEmoji) e.style.color = colors[i % colors.length];
+    fc.appendChild(e);
+  }
+}
+
+/* ripple on buttons */
+function initRipples(){
+  document.querySelectorAll('.btn, .ab, .nav-cta').forEach(b => {
+    b.addEventListener('click', function (e) {
+      const r = document.createElement('span');
+      r.className = 'ripple';
+      const rect = this.getBoundingClientRect();
+      const s = Math.max(rect.width, rect.height);
+      r.style.width = r.style.height = s + 'px';
+      r.style.left = (e.clientX - rect.left - s / 2) + 'px';
+      r.style.top = (e.clientY - rect.top - s / 2) + 'px';
+      this.appendChild(r);
+      setTimeout(() => r.remove(), 550);
+    });
+  });
+}
+
+/* scroll reveal */
+function initReveal(){
+  const items = document.querySelectorAll('.reveal');
+  if (!('IntersectionObserver' in window)) { items.forEach(i => i.classList.add('in')); return; }
+  const obs = new IntersectionObserver(entries => {
+    entries.forEach(en => { if (en.isIntersecting) { en.target.classList.add('in'); obs.unobserve(en.target); } });
+  }, { threshold:.15 });
+  items.forEach(i => obs.observe(i));
+}
+
+/* navbar scroll state + active link tracking */
+function initNavbarBehavior(){
+  const nav = document.getElementById('navbar');
+  window.addEventListener('scroll', () => {
+    nav.classList.toggle('scrolled', window.scrollY > 12);
+  }, { passive:true });
+
+  const sections = [...document.querySelectorAll('#features,#how')];
+  const links = [...document.querySelectorAll('.nav-links a[data-sec]')];
+  if ('IntersectionObserver' in window && sections.length){
+    const obs = new IntersectionObserver(entries => {
+      entries.forEach(en => {
+        if (en.isIntersecting){
+          links.forEach(l => l.classList.toggle('is-active', l.dataset.sec === en.target.id));
+        }
+      });
+    }, { rootMargin:'-40% 0px -50% 0px' });
+    sections.forEach(s => obs.observe(s));
+  }
+}
+
+/* mobile menu */
+function initMobileMenu(){
+  const burger = document.getElementById('navBurger');
+  const panel = document.getElementById('mobPanel');
+  if (!burger || !panel) return;
+  burger.addEventListener('click', () => {
+    const open = burger.classList.toggle('open');
+    panel.classList.toggle('show', open);
+  });
+  panel.querySelectorAll('a').forEach(a => a.addEventListener('click', () => {
+    burger.classList.remove('open'); panel.classList.remove('show');
+  }));
+  document.getElementById('mobAuthBtn').addEventListener('click', () => {
+    burger.classList.remove('open'); panel.classList.remove('show'); openAuth();
+  });
+}
+
+/* ====================================================================
+   DASHBOARD RENDER
+==================================================================== */
+function renderDashboard(){
+  const data = loadData();
+  if (!DOM.balNum) return;
+
+  DOM.balNum.textContent = Number(data.balance).toLocaleString('en-IN');
+  DOM.txCount.textContent = data.transactions.length;
+
+  let earned = 0, spent = 0;
+  data.transactions.forEach(t => {
+    if (t.type === 'add') earned += t.amount;
+    else spent += t.amount;
+  });
+  DOM.statEarned.textContent = Number(earned).toLocaleString('en-IN');
+  DOM.statSpent.textContent = Number(spent).toLocaleString('en-IN');
+  DOM.statCount.textContent = data.transactions.length;
+
+  DOM.txList.innerHTML = '';
+  if (!data.transactions.length){
+    DOM.txList.innerHTML = '<div class="txem"><span class="bi">\u{1F4B0}</span>No entries yet</div>';
+  } else {
+    [...data.transactions].reverse().slice(0, 100).forEach(t => {
+      const p = t.type === 'add', m = t.type === 'cut';
+      const ic = p ? 'p' : m ? 'm' : 's';
+      const ch = p ? '+' : m ? '\u2212' : '\u2192';
+      const sc = p ? 'p' : 'n';
+      const sg = p ? '+' : '\u2212';
+      const lb = t.label || (p ? 'Money added' : m ? 'Pay cut' : 'Paid to ' + (t.to || 'someone'));
+      const byName = (USERS[t.by] && USERS[t.by].name) || 'Someone';
+      const byEmoji = (USERS[t.by] && USERS[t.by].emoji) || '\u2764';
+      const el = document.createElement('div');
+      el.className = 'tx';
+      el.innerHTML =
+        '<div class="txi ' + ic + '">' + ch + '</div>' +
+        '<div class="txif"><div class="txlb">' + escapeHtml(lb) + '</div>' +
+        '<div class="txby">' + byEmoji + ' ' + byName + ' &bull; ' + (t.date || '') + '</div></div>' +
+        '<div class="txam ' + sc + '">' + sg + '\u20B9' + Number(t.amount).toLocaleString('en-IN') + '</div>';
+      DOM.txList.appendChild(el);
+    });
+  }
+
+  // hero stats (visible on landing too)
+  if (DOM.heroTxns) DOM.heroTxns.textContent = data.transactions.length;
+  if (DOM.heroBal) DOM.heroBal.textContent = '\u20B9' + Number(data.balance).toLocaleString('en-IN');
+}
+
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+/* ====================================================================
+   LOGS RENDER
+==================================================================== */
+const ACTION_META = {
+  add:  { dot:'p', icon:'+', label:'Added money' },
+  cut:  { dot:'m', icon:'\u2212', label:'Cut money' },
+  pay:  { dot:'s', icon:'\u2192', label:'Paid out' },
+  reset:{ dot:'r', icon:'\u21BB', label:'Reset data' }
+};
+
+function renderLogs(){
+  if (!DOM.logsTimeline) return;
+  const search = (document.getElementById('logSearch').value || '').toLowerCase().trim();
+  const filter = document.getElementById('logFilter').value;
+  let logs = loadLogs().slice().reverse();
+
+  if (filter !== 'all') logs = logs.filter(l => l.action === filter);
+  if (search) logs = logs.filter(l =>
+    (l.label || '').toLowerCase().includes(search) ||
+    (l.userName || '').toLowerCase().includes(search) ||
+    (l.action || '').toLowerCase().includes(search)
+  );
+
+  if (!logs.length){
+    DOM.logsTimeline.innerHTML = '<div class="logem"><span class="bi">\u{1F4C1}</span>No backup entries match yet</div>';
+    return;
+  }
+
+  DOM.logsTimeline.innerHTML = logs.map((l, i) => {
+    const meta = ACTION_META[l.action] || ACTION_META.add;
+    const isLast = i === logs.length - 1;
+    const byEmoji = (USERS[l.user] && USERS[l.user].emoji) || '\u2764';
+    return (
+      '<div class="log-row">' +
+        '<div class="log-rail"><div class="log-dot ' + meta.dot + '"></div>' + (isLast ? '' : '<div class="log-line"></div>') + '</div>' +
+        '<div class="log-card">' +
+          '<div class="log-top">' +
+            '<div class="log-action">' + byEmoji + ' ' + meta.label + '</div>' +
+            '<div class="log-time">' + (l.date || '') + '</div>' +
+          '</div>' +
+          '<div class="log-meta">' + escapeHtml(l.userName || 'Someone') + ' &middot; ' + escapeHtml(l.label || '') +
+            (l.amount ? ' &middot; \u20B9' + Number(l.amount).toLocaleString('en-IN') : '') + '</div>' +
+          '<div class="log-bal">\u20B9' + Number(l.oldBalance).toLocaleString('en-IN') + ' \u2192 \u20B9' + Number(l.newBalance).toLocaleString('en-IN') + '</div>' +
+          '<div class="log-status">&#10003; Saved</div>' +
+        '</div>' +
+      '</div>'
+    );
+  }).join('');
+}
+
+/* ====================================================================
+   ACTIONS
+==================================================================== */
+function addTransaction(type, amount, label, extra){
+  extra = extra || {};
+  amount = Number(amount);
+  if (!amount || amount <= 0){ toast('Enter a valid amount', 2200, true); return false; }
+
+  const data = loadData();
+  if ((type === 'cut' || type === 'pay') && amount > data.balance){
+    toast('Not enough balance, love', 2400, true);
+    return false;
+  }
+
+  const oldBal = data.balance;
+  const id = genId();
+  const tx = Object.assign({ id, type, amount, label, date: now(), iso: new Date().toISOString(), by: currentUser }, extra);
+  data.transactions.push(tx);
+  data.balance = type === 'add' ? data.balance + amount : data.balance - amount;
+  saveData(data);
+
+  addLog({
+    id: genId(), recordId: id, ts: Date.now(), date: now(),
+    user: currentUser, userName: (USERS[currentUser] && USERS[currentUser].name) || currentUser,
+    action: type, amount, label, oldBalance: oldBal, newBalance: data.balance, status: 'success'
+  });
+
+  renderDashboard();
+  renderLogs();
+
+  if (DOM.balDisplay){
+    DOM.balDisplay.classList.remove('pop');
+    void DOM.balDisplay.offsetWidth;
+    DOM.balDisplay.classList.add('pop');
+  }
+  const diff = data.balance - oldBal;
+  if (DOM.balDiff){
+    DOM.balDiff.className = 'df show ' + (diff > 0 ? 'up' : 'down');
+    DOM.balDiff.textContent = (diff > 0 ? '+' : '') + Number(diff).toLocaleString('en-IN');
+    clearTimeout(DOM.balDiff._t);
+    DOM.balDiff._t = setTimeout(() => { DOM.balDiff.className = 'df'; }, 2800);
+  }
+
+  const verb = type === 'add' ? 'Added \u20B9' : type === 'cut' ? 'Cut \u20B9' : 'Paid \u20B9';
+  const tail = type === 'pay' ? ' to ' + (extra.to || 'someone') : '';
+  toast(verb + Number(amount).toLocaleString('en-IN') + tail + ' \u2764');
+  return true;
+}
+
+function resetData(){
+  const data = loadData();
+  const oldBal = data.balance, count = data.transactions.length;
+  saveData({ balance:0, transactions:[] });
+  addLog({
+    id: genId(), recordId: null, ts: Date.now(), date: now(),
+    user: currentUser, userName: (USERS[currentUser] && USERS[currentUser].name) || currentUser,
+    action: 'reset', amount: oldBal, label: 'Cleared ' + count + ' entries', oldBalance: oldBal, newBalance: 0, status: 'success'
+  });
+  renderDashboard();
+  renderLogs();
+  if (DOM.balDiff) DOM.balDiff.className = 'df';
+  toast('All data reset \u2764');
+}
+
+/* ====================================================================
+   AUTH (shared data, persisted session)
+==================================================================== */
+function applyLoggedInUI(username){
+  const u = USERS[username];
+  if (!u) return;
+  if (DOM.navAv) DOM.navAv.textContent = u.emoji;
+  if (DOM.navNm) DOM.navNm.textContent = u.name;
+  if (DOM.greetText) DOM.greetText.textContent = 'Hi, ' + u.name + ' \u{1F44B}';
+  if (DOM.greetEmoji) DOM.greetEmoji.textContent = u.emoji;
+}
+
+function login(username, password){
+  const u = (username || '').toLowerCase().trim();
+  if (!USERS[u] || USERS[u].pass !== password) return false;
+
+  currentUser = u;
+  try{ localStorage.setItem(SESSION_KEY, JSON.stringify({ user: u, ts: Date.now() })); }catch(e){}
+  document.documentElement.classList.add('lm-authed');
+  applyLoggedInUI(u);
+
+  const authO = document.getElementById('authOverlay');
+  if (authO){
+    authO.classList.remove('show');
+    const err = authO.querySelector('.auth-err');
+    if (err) err.classList.remove('show');
+  }
+
+  renderDashboard();
+  renderLogs();
+  toast('Welcome, ' + USERS[u].name + ' \u2764');
+  return true;
+}
+
+function restoreSession(){
+  try{
+    const s = JSON.parse(localStorage.getItem(SESSION_KEY));
+    if (s && s.user && USERS[s.user]){
+      currentUser = s.user;
+      document.documentElement.classList.add('lm-authed');
+      applyLoggedInUI(s.user);
+      renderDashboard();
+      renderLogs();
+      return true;
+    }
+  }catch(e){}
+  document.documentElement.classList.remove('lm-authed');
+  return false;
+}
+
+function logout(){
+  currentUser = null;
+  try{ localStorage.removeItem(SESSION_KEY); }catch(e){}
+  document.documentElement.classList.remove('lm-authed');
+  window.scrollTo({ top:0, behavior:'smooth' });
+  toast('Signed out \u2764');
+}
+
+function openAuth(){
+  const overlay = document.getElementById('authOverlay');
+  overlay.classList.add('show');
+  setTimeout(() => document.getElementById('authUser').focus(), 200);
+}
+function closeAuth(){
+  const overlay = document.getElementById('authOverlay');
+  overlay.classList.remove('show');
+  const err = document.getElementById('authErr');
+  if (err) err.classList.remove('show');
+  document.getElementById('authUser').value = '';
+  document.getElementById('authPass').value = '';
+}
+window.openAuth = openAuth;
+window.closeAuth = closeAuth;
+
+/* ====================================================================
+   GENERIC MODAL
+==================================================================== */
+function showModal(title, html, onConfirm){
+  const overlay = document.getElementById('modalO');
+  const titleEl = document.getElementById('mT');
+  const bodyEl = document.getElementById('mB');
+  if (!overlay || !titleEl || !bodyEl) return Promise.resolve(null);
+
+  titleEl.innerHTML = title;
+  bodyEl.innerHTML = html;
+  overlay.classList.add('show');
+
+  return new Promise(resolve => {
+    const cnf = bodyEl.querySelector('.btn-cnf');
+    const can = bodyEl.querySelector('.btn-can');
+    if (can) can.onclick = () => { overlay.classList.remove('show'); resolve(null); };
+    if (cnf) cnf.onclick = () => {
+      const d = onConfirm ? onConfirm() : null;
+      if (d !== null && d !== undefined){ overlay.classList.remove('show'); resolve(d); }
+    };
+    overlay.onclick = e => { if (e.target === overlay){ overlay.classList.remove('show'); resolve(null); } };
+    bodyEl.querySelectorAll('input').forEach(i => i.onkeydown = e => { if (e.key === 'Enter' && cnf) cnf.click(); });
+    setTimeout(() => { const f = bodyEl.querySelector('input,select'); if (f) f.focus(); }, 100);
+  });
+}
+
+function getModalAmount(){
+  const v = parseFloat(document.getElementById('mA').value);
+  if (!v || v <= 0){ toast('Enter a valid amount', 2200, true); return null; }
+  return v;
+}
+function getModalDesc(fallback){
+  const el = document.getElementById('mD');
+  return (el && el.value.trim()) || fallback;
+}
+
+/* ====================================================================
+   KEYBOARD SHORTCUTS
+==================================================================== */
+function setupKeyboard(actions){
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape'){
+      document.getElementById('modalO').classList.remove('show');
+      closeAuth();
+      const panel = document.getElementById('mobPanel'), burger = document.getElementById('navBurger');
+      if (panel) panel.classList.remove('show');
+      if (burger) burger.classList.remove('open');
+    }
+    const dash = document.getElementById('dashPage');
+    if (!document.documentElement.classList.contains('lm-authed')) return;
+    if (['INPUT','TEXTAREA','SELECT'].includes(e.target.tagName)) return;
+    if (e.key === '1' && actions.add){ actions.add(); e.preventDefault(); }
+    if (e.key === '2' && actions.cut){ actions.cut(); e.preventDefault(); }
+    if (e.key === '3' && actions.pay){ actions.pay(); e.preventDefault(); }
+  });
+}
+
+/* ====================================================================
+   WIRE UP UI
+==================================================================== */
+document.addEventListener('DOMContentLoaded', () => {
+  cacheDom();
+  initFloaters();
+  initRipples();
+  initReveal();
+  initNavbarBehavior();
+  initMobileMenu();
+  restoreSession();
+  renderDashboard();
+  renderLogs();
+
+  document.getElementById('authOverlay').onclick = function(e){ if (e.target === this) closeAuth(); };
+
+  document.getElementById('authBtn').onclick = function(){
+    const u = document.getElementById('authUser').value;
+    const p = document.getElementById('authPass').value;
+    if (!login(u, p)){
+      document.getElementById('authErr').classList.add('show');
+      setTimeout(() => document.getElementById('authErr').classList.remove('show'), 2500);
+    }
+  };
+  document.getElementById('authPass').onkeydown = e => { if (e.key === 'Enter') document.getElementById('authBtn').click(); };
+  document.getElementById('authUser').onkeydown = e => { if (e.key === 'Enter') document.getElementById('authPass').focus(); };
+
+  document.getElementById('logoutBtn').onclick = logout;
+
+  document.getElementById('actAdd').onclick = async () => {
+    const h = '<div class="fd"><label>\u20B9 Amount</label><input type="number" id="mA" min="1" step="any" placeholder="500"></div>' +
+      '<div class="fd"><label>\u{1F4DD} Note</label><input type="text" id="mD" placeholder="Salary, gift ..."></div>' +
+      '<div class="ma"><button class="btn btn-ghost-m btn-can">Cancel</button><button class="btn btn-rose btn-cnf">+ Add</button></div>';
+    const d = await showModal('+ Add Money \u2764', h, () => { const a = getModalAmount(); if (!a) return null; return { amount:a, label:getModalDesc('Money added') }; });
+    if (d) addTransaction('add', d.amount, d.label);
+  };
+
+  document.getElementById('actCut').onclick = async () => {
+    const h = '<div class="fd"><label>\u20B9 Amount</label><input type="number" id="mA" min="1" step="any" placeholder="200"></div>' +
+      '<div class="fd"><label>\u{1F4DD} Note</label><input type="text" id="mD" placeholder="Expense, bill ..."></div>' +
+      '<div class="ma"><button class="btn btn-ghost-m btn-can">Cancel</button><button class="btn btn-rose btn-cnf">\u2212 Cut</button></div>';
+    const d = await showModal('\u2212 Cut Money \u2764', h, () => { const a = getModalAmount(); if (!a) return null; return { amount:a, label:getModalDesc('Pay cut') }; });
+    if (d) addTransaction('cut', d.amount, d.label);
+  };
+
+  document.getElementById('actPay').onclick = async () => {
+    const h = '<div class="fd"><label>\u{1F464} Recipient</label><input type="text" id="mTo" placeholder="Who?"></div>' +
+      '<div class="fd"><label>\u20B9 Amount</label><input type="number" id="mA" min="1" step="any" placeholder="300"></div>' +
+      '<div class="fd"><label>\u{1F4DD} Note</label><input type="text" id="mD" placeholder="Dinner, rent ..."></div>' +
+      '<div class="ma"><button class="btn btn-ghost-m btn-can">Cancel</button><button class="btn btn-rose btn-cnf">\u2192 Pay</button></div>';
+    const d = await showModal('\u2192 Pay Someone \u2764', h, () => {
+      const to = document.getElementById('mTo').value.trim();
+      const a = getModalAmount();
+      if (!to){ toast('Enter a recipient', 2200, true); return null; }
+      if (!a) return null;
+      return { amount:a, label:getModalDesc('Payment to ' + to), to };
+    });
+    if (d) addTransaction('pay', d.amount, d.label, { to:d.to });
+  };
+
+  document.getElementById('actReset').onclick = async () => {
+    const h = '<p style="color:var(--muted);font-size:.82rem;margin-bottom:4px">Reset the shared balance to \u20B90?</p>' +
+      '<p style="color:var(--muted);font-size:.68rem;opacity:.6">This can\u2019t be undone \u2014 but it will still appear in your Activity Log \u2764</p>' +
+      '<div class="ma"><button class="btn btn-ghost-m btn-can">Cancel</button><button class="btn btn-rose btn-cnf">\u21BB Reset</button></div>';
+    const d = await showModal('\u26A0 Reset Data \u2764', h, () => true);
+    if (d) resetData();
+  };
+
+  setupKeyboard({
+    add: () => document.getElementById('actAdd').click(),
+    cut: () => document.getElementById('actCut').click(),
+    pay: () => document.getElementById('actPay').click()
+  });
+
+  /* dashboard tabs */
+  document.querySelectorAll('#dashTabs .seg-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('#dashTabs .seg-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      activeTab = btn.dataset.tab;
+      document.getElementById('panelOverview').hidden = activeTab !== 'overview';
+      document.getElementById('panelLogs').hidden = activeTab !== 'logs';
+      if (activeTab === 'logs') renderLogs();
+    });
+  });
+
+  /* logs search/filter */
+  document.getElementById('logSearch').addEventListener('input', renderLogs);
+  document.getElementById('logFilter').addEventListener('change', renderLogs);
+
+  /* export logs as a JSON backup file */
+  document.getElementById('logExport').onclick = () => {
+    const logs = loadLogs();
+    if (!logs.length){ toast('No logs to export yet', 2000, true); return; }
+    const blob = new Blob([JSON.stringify(logs, null, 2)], { type:'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'lovely-money-backup-' + new Date().toISOString().slice(0,10) + '.json';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    toast('Backup exported \u2764');
+  };
+
+  /* clear logs (with confirmation) */
+  document.getElementById('logClear').onclick = async () => {
+    const h = '<p style="color:var(--muted);font-size:.82rem;margin-bottom:4px">Clear the entire activity log?</p>' +
+      '<p style="color:var(--muted);font-size:.68rem;opacity:.6">Your balance and transactions stay untouched \u2014 only this backup trail is cleared.</p>' +
+      '<div class="ma"><button class="btn btn-ghost-m btn-can">Cancel</button><button class="btn btn-rose btn-cnf">\u{1F5D1} Clear</button></div>';
+    const d = await showModal('\u26A0 Clear Logs \u2764', h, () => true);
+    if (d){ saveLogs([]); renderLogs(); toast('Activity log cleared \u2764'); }
+  };
+
+  console.log('%c\u2665 lovely money \u2665', 'font-size:16px;font-weight:800;color:#ff8fb3');
+  console.log('%cmade for advik33 & anyacutie1', 'color:#9d7e96');
+});
+</script>
+</body>
+</html>
