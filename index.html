@@ -854,27 +854,32 @@ const USERS = {
   advik33:    { pass:'advik@33',  name:'Advik', emoji:'\u{1F9F8}' }, // teddy
   anyacutie1: { pass:'anya@cutie1', name:'Anya',  emoji:'\u{1F43C}' }  // panda
 };
-const DATA_KEY = 'lovemoney_shared_data_v2';
-const LOG_KEY  = 'lovemoney_shared_logs_v2';
 const SESSION_KEY = 'lovemoney_session_v2';
-/* ── Firebase config ──
-   Replace with YOUR Firebase project config from
-   https://console.firebase.google.com > Project Settings > General > Your apps > Web
-   Enable Realtime Database in the Firebase Console.
-*/
-const firebaseConfig = {
-  apiKey: "AIzaSyBcO1C4rXq8Xq8Xq8Xq8Xq8Xq8Xq8Xq8Xq8",
-  authDomain: "your-project.firebaseapp.com",
-  databaseURL: "https://your-project-default-rtdb.firebaseio.com",
-  projectId: "your-project",
-  storageBucket: "your-project.appspot.com",
-  messagingSenderId: "123456789",
-  appId: "1:123456789:web:abc123def456"
-};
-firebase.initializeApp(firebaseConfig);
-const fbDb = firebase.database();
-const fbDataRef = fbDb.ref('data');
-const fbLogsRef = fbDb.ref('logs');
+const DATA_KEY_FALLBACK = 'lovemoney_data_fb';
+const LOG_KEY_FALLBACK = 'lovemoney_logs_fb';
+
+let fbDataRef = null;
+let fbLogsRef = null;
+let fbAvailable = false;
+try {
+  if (typeof firebase !== 'undefined') {
+    firebase.initializeApp({
+      apiKey: "AIzaSyBZUiayKufQTY_iUa9mPqB94EF7aFXi13k",
+      authDomain: "lovely-money-956f3.firebaseapp.com",
+      databaseURL: "https://lovely-money-956f3-default-rtdb.firebaseio.com",
+      projectId: "lovely-money-956f3",
+      storageBucket: "lovely-money-956f3.firebasestorage.app",
+      messagingSenderId: "711138670313",
+      appId: "1:711138670313:web:fb2f67621aad4edef96278"
+    });
+    const db = firebase.database();
+    fbDataRef = db.ref('data');
+    fbLogsRef = db.ref('logs');
+    fbAvailable = true;
+  }
+} catch(e) {
+  console.warn('Firebase unavailable, using localStorage fallback');
+}
 
 let cachedData = null;
 let cachedLogs = null;
@@ -904,53 +909,71 @@ function now(){
   return new Date().toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' });
 }
 
-/* ── Firebase storage helpers (shared across all devices) ── */
+/* ── Firebase storage helpers (with localStorage fallback) ── */
 async function loadData(noCache){
   if (!noCache && cachedData) return cachedData;
+  if (fbAvailable) {
+    try {
+      const snap = await fbDataRef.once('value');
+      const raw = snap.val();
+      if (raw && typeof raw.balance === 'number' && Array.isArray(raw.transactions)){
+        cachedData = raw;
+        localStorage.setItem(DATA_KEY_FALLBACK, JSON.stringify(raw));
+        return raw;
+      }
+    } catch(e){}
+  }
   try {
-    const snap = await fbDataRef.once('value');
-    const raw = snap.val();
-    if (raw && typeof raw.balance === 'number' && Array.isArray(raw.transactions)){
-      cachedData = raw;
-      return raw;
-    }
+    const raw = JSON.parse(localStorage.getItem(DATA_KEY_FALLBACK));
+    if (raw && typeof raw.balance === 'number' && Array.isArray(raw.transactions)){ cachedData = raw; return raw; }
   } catch(e){}
   return { balance:0, transactions:[] };
 }
 async function saveData(d){
   cachedData = d;
-  try {
-    await fbDataRef.set(d);
-    broadcastSync();
-  } catch(e){
-    toast('Could not save to cloud', 3000, true);
+  try { localStorage.setItem(DATA_KEY_FALLBACK, JSON.stringify(d)); } catch(e){}
+  if (fbAvailable) {
+    try { await fbDataRef.set(d); broadcastSync(); } catch(e){ toast('Cloud sync failed', 3000, true); }
   }
 }
 async function loadLogs(noCache){
   if (!noCache && cachedLogs) return cachedLogs;
+  if (fbAvailable) {
+    try {
+      const snap = await fbLogsRef.once('value');
+      const raw = snap.val();
+      if (Array.isArray(raw)){ cachedLogs = raw; localStorage.setItem(LOG_KEY_FALLBACK, JSON.stringify(raw)); return raw; }
+    } catch(e){}
+  }
   try {
-    const snap = await fbLogsRef.once('value');
-    const raw = snap.val();
+    const raw = JSON.parse(localStorage.getItem(LOG_KEY_FALLBACK));
     if (Array.isArray(raw)){ cachedLogs = raw; return raw; }
   } catch(e){}
   return [];
 }
 async function saveLogs(l){
   cachedLogs = l;
-  try {
-    await fbLogsRef.set(l);
-    broadcastSync();
-  } catch(e){}
+  try { localStorage.setItem(LOG_KEY_FALLBACK, JSON.stringify(l)); } catch(e){}
+  if (fbAvailable) {
+    try { await fbLogsRef.set(l); broadcastSync(); } catch(e){}
+  }
 }
 async function addLog(entry){
   cachedLogs = null;
   try {
-    const snap = await fbLogsRef.once('value');
-    const logs = snap.val() || [];
+    const logs = JSON.parse(localStorage.getItem(LOG_KEY_FALLBACK)) || [];
     logs.push(entry);
-    await fbLogsRef.set(logs);
-    broadcastSync();
+    localStorage.setItem(LOG_KEY_FALLBACK, JSON.stringify(logs));
   } catch(e){}
+  if (fbAvailable) {
+    try {
+      const snap = await fbLogsRef.once('value');
+      const logs = snap.val() || [];
+      logs.push(entry);
+      await fbLogsRef.set(logs);
+      broadcastSync();
+    } catch(e){}
+  }
 }
 
 /* ====================================================================
@@ -1368,28 +1391,28 @@ document.addEventListener('DOMContentLoaded', async () => {
   await renderLogs();
 
   // cross-device real-time sync via Firebase
-  fbDataRef.on('value', async (snap) => {
-    if (!firebaseReady) { firebaseReady = true; return; }
-    const raw = snap.val();
-    if (raw && typeof raw.balance === 'number' && Array.isArray(raw.transactions)){
-      if (JSON.stringify(raw) !== JSON.stringify(cachedData)) {
-        cachedData = raw;
-        await renderDashboard();
+  if (fbAvailable) {
+    fbDataRef.on('value', async (snap) => {
+      if (!firebaseReady) { firebaseReady = true; return; }
+      const raw = snap.val();
+      if (raw && typeof raw.balance === 'number' && Array.isArray(raw.transactions)){
+        if (JSON.stringify(raw) !== JSON.stringify(cachedData)) {
+          cachedData = raw;
+          await renderDashboard();
+        }
       }
-    }
-  });
-  fbLogsRef.on('value', async () => {
-    if (!firebaseReady) return;
-    cachedLogs = null;
-    await renderLogs();
-  });
+    });
+    fbLogsRef.on('value', async () => {
+      if (!firebaseReady) return;
+      cachedLogs = null;
+      await renderLogs();
+    });
+  }
   // cross-tab sync (same browser, different tabs)
   if (syncChannel) {
     syncChannel.onmessage = async () => { await renderDashboard(); await renderLogs(); };
   }
-  window.addEventListener('storage', async (e) => {
-    if (e.key === DATA_KEY || e.key === LOG_KEY) { await renderDashboard(); await renderLogs(); }
-  });
+
 
   document.getElementById('authOverlay').onclick = function(e){ if (e.target === this) closeAuth(); };
 
