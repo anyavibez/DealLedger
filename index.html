@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>lovely money &#9825; a shared tracker for two</title>
+<title>lovely-money &#9825; a shared tracker for two</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ctext x='16' y='24' font-size='24' text-anchor='middle'%3E%F0%9F%A7%B8%3C/text%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -499,6 +499,8 @@ html.lm-authed .dash-page{display:block}
   .float-chip{font-size:.66rem;padding:7px 13px}
 }
 </style>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 </head>
 <body>
 
@@ -855,6 +857,35 @@ const USERS = {
 const DATA_KEY = 'lovemoney_shared_data_v2';
 const LOG_KEY  = 'lovemoney_shared_logs_v2';
 const SESSION_KEY = 'lovemoney_session_v2';
+/* ── Firebase config ──
+   Replace with YOUR Firebase project config from
+   https://console.firebase.google.com > Project Settings > General > Your apps > Web
+   Enable Realtime Database in the Firebase Console.
+*/
+const firebaseConfig = {
+  apiKey: "AIzaSyBcO1C4rXq8Xq8Xq8Xq8Xq8Xq8Xq8Xq8Xq8",
+  authDomain: "your-project.firebaseapp.com",
+  databaseURL: "https://your-project-default-rtdb.firebaseio.com",
+  projectId: "your-project",
+  storageBucket: "your-project.appspot.com",
+  messagingSenderId: "123456789",
+  appId: "1:123456789:web:abc123def456"
+};
+firebase.initializeApp(firebaseConfig);
+const fbDb = firebase.database();
+const fbDataRef = fbDb.ref('data');
+const fbLogsRef = fbDb.ref('logs');
+
+let cachedData = null;
+let cachedLogs = null;
+let firebaseReady = false;
+
+const SYNC_CHANNEL = 'lovemoney_sync_v2';
+let syncChannel = null;
+try { syncChannel = new BroadcastChannel(SYNC_CHANNEL); } catch(e) {}
+function broadcastSync(){
+  try { if (syncChannel) syncChannel.postMessage('update'); } catch(e) {}
+}
 
 let currentUser = null;
 let activeTab = 'overview';
@@ -873,31 +904,53 @@ function now(){
   return new Date().toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' });
 }
 
-/* ── storage helpers (shared between both accounts) ── */
-function loadData(){
-  try{
-    const raw = JSON.parse(localStorage.getItem(DATA_KEY));
-    if (raw && typeof raw.balance === 'number' && Array.isArray(raw.transactions)) return raw;
-  }catch(e){}
+/* ── Firebase storage helpers (shared across all devices) ── */
+async function loadData(noCache){
+  if (!noCache && cachedData) return cachedData;
+  try {
+    const snap = await fbDataRef.once('value');
+    const raw = snap.val();
+    if (raw && typeof raw.balance === 'number' && Array.isArray(raw.transactions)){
+      cachedData = raw;
+      return raw;
+    }
+  } catch(e){}
   return { balance:0, transactions:[] };
 }
-function saveData(d){
-  try{ localStorage.setItem(DATA_KEY, JSON.stringify(d)); }catch(e){ toast('Could not save \u2014 storage full?', 3000, true); }
+async function saveData(d){
+  cachedData = d;
+  try {
+    await fbDataRef.set(d);
+    broadcastSync();
+  } catch(e){
+    toast('Could not save to cloud', 3000, true);
+  }
 }
-function loadLogs(){
-  try{
-    const raw = JSON.parse(localStorage.getItem(LOG_KEY));
-    if (Array.isArray(raw)) return raw;
-  }catch(e){}
+async function loadLogs(noCache){
+  if (!noCache && cachedLogs) return cachedLogs;
+  try {
+    const snap = await fbLogsRef.once('value');
+    const raw = snap.val();
+    if (Array.isArray(raw)){ cachedLogs = raw; return raw; }
+  } catch(e){}
   return [];
 }
-function saveLogs(l){
-  try{ localStorage.setItem(LOG_KEY, JSON.stringify(l)); }catch(e){}
+async function saveLogs(l){
+  cachedLogs = l;
+  try {
+    await fbLogsRef.set(l);
+    broadcastSync();
+  } catch(e){}
 }
-function addLog(entry){
-  const logs = loadLogs();
-  logs.push(entry);
-  saveLogs(logs);
+async function addLog(entry){
+  cachedLogs = null;
+  try {
+    const snap = await fbLogsRef.once('value');
+    const logs = snap.val() || [];
+    logs.push(entry);
+    await fbLogsRef.set(logs);
+    broadcastSync();
+  } catch(e){}
 }
 
 /* ====================================================================
@@ -1005,8 +1058,8 @@ function initMobileMenu(){
 /* ====================================================================
    DASHBOARD RENDER
 ==================================================================== */
-function renderDashboard(){
-  const data = loadData();
+async function renderDashboard(){
+  const data = await loadData();
   if (!DOM.balNum) return;
 
   DOM.balNum.textContent = Number(data.balance).toLocaleString('en-IN');
@@ -1064,11 +1117,11 @@ const ACTION_META = {
   reset:{ dot:'r', icon:'\u21BB', label:'Reset data' }
 };
 
-function renderLogs(){
+async function renderLogs(){
   if (!DOM.logsTimeline) return;
   const search = (document.getElementById('logSearch').value || '').toLowerCase().trim();
   const filter = document.getElementById('logFilter').value;
-  let logs = loadLogs().slice().reverse();
+  let logs = (await loadLogs()).slice().reverse();
 
   if (filter !== 'all') logs = logs.filter(l => l.action === filter);
   if (search) logs = logs.filter(l =>
@@ -1107,12 +1160,12 @@ function renderLogs(){
 /* ====================================================================
    ACTIONS
 ==================================================================== */
-function addTransaction(type, amount, label, extra){
+async function addTransaction(type, amount, label, extra){
   extra = extra || {};
   amount = Number(amount);
   if (!amount || amount <= 0){ toast('Enter a valid amount', 2200, true); return false; }
 
-  const data = loadData();
+  const data = await loadData(true);
   if ((type === 'cut' || type === 'pay') && amount > data.balance){
     toast('Not enough balance, love', 2400, true);
     return false;
@@ -1123,16 +1176,16 @@ function addTransaction(type, amount, label, extra){
   const tx = Object.assign({ id, type, amount, label, date: now(), iso: new Date().toISOString(), by: currentUser }, extra);
   data.transactions.push(tx);
   data.balance = type === 'add' ? data.balance + amount : data.balance - amount;
-  saveData(data);
+  await saveData(data);
 
-  addLog({
+  await addLog({
     id: genId(), recordId: id, ts: Date.now(), date: now(),
     user: currentUser, userName: (USERS[currentUser] && USERS[currentUser].name) || currentUser,
     action: type, amount, label, oldBalance: oldBal, newBalance: data.balance, status: 'success'
   });
 
-  renderDashboard();
-  renderLogs();
+  await renderDashboard();
+  await renderLogs();
 
   if (DOM.balDisplay){
     DOM.balDisplay.classList.remove('pop');
@@ -1153,17 +1206,17 @@ function addTransaction(type, amount, label, extra){
   return true;
 }
 
-function resetData(){
-  const data = loadData();
+async function resetData(){
+  const data = await loadData(true);
   const oldBal = data.balance, count = data.transactions.length;
-  saveData({ balance:0, transactions:[] });
-  addLog({
+  await saveData({ balance:0, transactions:[] });
+  await addLog({
     id: genId(), recordId: null, ts: Date.now(), date: now(),
     user: currentUser, userName: (USERS[currentUser] && USERS[currentUser].name) || currentUser,
     action: 'reset', amount: oldBal, label: 'Cleared ' + count + ' entries', oldBalance: oldBal, newBalance: 0, status: 'success'
   });
-  renderDashboard();
-  renderLogs();
+  await renderDashboard();
+  await renderLogs();
   if (DOM.balDiff) DOM.balDiff.className = 'df';
   toast('All data reset \u2764');
 }
@@ -1180,7 +1233,7 @@ function applyLoggedInUI(username){
   if (DOM.greetEmoji) DOM.greetEmoji.textContent = u.emoji;
 }
 
-function login(username, password){
+async function login(username, password){
   const u = (username || '').toLowerCase().trim();
   if (!USERS[u] || USERS[u].pass !== password) return false;
 
@@ -1196,21 +1249,21 @@ function login(username, password){
     if (err) err.classList.remove('show');
   }
 
-  renderDashboard();
-  renderLogs();
+  await renderDashboard();
+  await renderLogs();
   toast('Welcome, ' + USERS[u].name + ' \u2764');
   return true;
 }
 
-function restoreSession(){
+async function restoreSession(){
   try{
     const s = JSON.parse(localStorage.getItem(SESSION_KEY));
     if (s && s.user && USERS[s.user]){
       currentUser = s.user;
       document.documentElement.classList.add('lm-authed');
       applyLoggedInUI(s.user);
-      renderDashboard();
-      renderLogs();
+      await renderDashboard();
+      await renderLogs();
       return true;
     }
   }catch(e){}
@@ -1303,23 +1356,47 @@ function setupKeyboard(actions){
 /* ====================================================================
    WIRE UP UI
 ==================================================================== */
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
   cacheDom();
   initFloaters();
   initRipples();
   initReveal();
   initNavbarBehavior();
   initMobileMenu();
-  restoreSession();
-  renderDashboard();
-  renderLogs();
+  await restoreSession();
+  await renderDashboard();
+  await renderLogs();
+
+  // cross-device real-time sync via Firebase
+  fbDataRef.on('value', async (snap) => {
+    if (!firebaseReady) { firebaseReady = true; return; }
+    const raw = snap.val();
+    if (raw && typeof raw.balance === 'number' && Array.isArray(raw.transactions)){
+      if (JSON.stringify(raw) !== JSON.stringify(cachedData)) {
+        cachedData = raw;
+        await renderDashboard();
+      }
+    }
+  });
+  fbLogsRef.on('value', async () => {
+    if (!firebaseReady) return;
+    cachedLogs = null;
+    await renderLogs();
+  });
+  // cross-tab sync (same browser, different tabs)
+  if (syncChannel) {
+    syncChannel.onmessage = async () => { await renderDashboard(); await renderLogs(); };
+  }
+  window.addEventListener('storage', async (e) => {
+    if (e.key === DATA_KEY || e.key === LOG_KEY) { await renderDashboard(); await renderLogs(); }
+  });
 
   document.getElementById('authOverlay').onclick = function(e){ if (e.target === this) closeAuth(); };
 
-  document.getElementById('authBtn').onclick = function(){
+  document.getElementById('authBtn').onclick = async function(){
     const u = document.getElementById('authUser').value;
     const p = document.getElementById('authPass').value;
-    if (!login(u, p)){
+    if (!(await login(u, p))){
       document.getElementById('authErr').classList.add('show');
       setTimeout(() => document.getElementById('authErr').classList.remove('show'), 2500);
     }
@@ -1334,7 +1411,7 @@ document.addEventListener('DOMContentLoaded', () => {
       '<div class="fd"><label>\u{1F4DD} Note</label><input type="text" id="mD" placeholder="Salary, gift ..."></div>' +
       '<div class="ma"><button class="btn btn-ghost-m btn-can">Cancel</button><button class="btn btn-rose btn-cnf">+ Add</button></div>';
     const d = await showModal('+ Add Money \u2764', h, () => { const a = getModalAmount(); if (!a) return null; return { amount:a, label:getModalDesc('Money added') }; });
-    if (d) addTransaction('add', d.amount, d.label);
+    if (d) await addTransaction('add', d.amount, d.label);
   };
 
   document.getElementById('actCut').onclick = async () => {
@@ -1342,7 +1419,7 @@ document.addEventListener('DOMContentLoaded', () => {
       '<div class="fd"><label>\u{1F4DD} Note</label><input type="text" id="mD" placeholder="Expense, bill ..."></div>' +
       '<div class="ma"><button class="btn btn-ghost-m btn-can">Cancel</button><button class="btn btn-rose btn-cnf">\u2212 Cut</button></div>';
     const d = await showModal('\u2212 Cut Money \u2764', h, () => { const a = getModalAmount(); if (!a) return null; return { amount:a, label:getModalDesc('Pay cut') }; });
-    if (d) addTransaction('cut', d.amount, d.label);
+    if (d) await addTransaction('cut', d.amount, d.label);
   };
 
   document.getElementById('actPay').onclick = async () => {
@@ -1357,7 +1434,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (!a) return null;
       return { amount:a, label:getModalDesc('Payment to ' + to), to };
     });
-    if (d) addTransaction('pay', d.amount, d.label, { to:d.to });
+    if (d) await addTransaction('pay', d.amount, d.label, { to:d.to });
   };
 
   document.getElementById('actReset').onclick = async () => {
@@ -1365,7 +1442,7 @@ document.addEventListener('DOMContentLoaded', () => {
       '<p style="color:var(--muted);font-size:.68rem;opacity:.6">This can\u2019t be undone \u2014 but it will still appear in your Activity Log \u2764</p>' +
       '<div class="ma"><button class="btn btn-ghost-m btn-can">Cancel</button><button class="btn btn-rose btn-cnf">\u21BB Reset</button></div>';
     const d = await showModal('\u26A0 Reset Data \u2764', h, () => true);
-    if (d) resetData();
+    if (d) await resetData();
   };
 
   setupKeyboard({
@@ -1376,23 +1453,23 @@ document.addEventListener('DOMContentLoaded', () => {
 
   /* dashboard tabs */
   document.querySelectorAll('#dashTabs .seg-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
+    btn.addEventListener('click', async () => {
       document.querySelectorAll('#dashTabs .seg-btn').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
       activeTab = btn.dataset.tab;
       document.getElementById('panelOverview').hidden = activeTab !== 'overview';
       document.getElementById('panelLogs').hidden = activeTab !== 'logs';
-      if (activeTab === 'logs') renderLogs();
+      if (activeTab === 'logs') await renderLogs();
     });
   });
 
   /* logs search/filter */
-  document.getElementById('logSearch').addEventListener('input', renderLogs);
-  document.getElementById('logFilter').addEventListener('change', renderLogs);
+  document.getElementById('logSearch').addEventListener('input', async () => { await renderLogs(); });
+  document.getElementById('logFilter').addEventListener('change', async () => { await renderLogs(); });
 
   /* export logs as a JSON backup file */
-  document.getElementById('logExport').onclick = () => {
-    const logs = loadLogs();
+  document.getElementById('logExport').onclick = async () => {
+    const logs = await loadLogs(true);
     if (!logs.length){ toast('No logs to export yet', 2000, true); return; }
     const blob = new Blob([JSON.stringify(logs, null, 2)], { type:'application/json' });
     const url = URL.createObjectURL(blob);
@@ -1412,7 +1489,7 @@ document.addEventListener('DOMContentLoaded', () => {
       '<p style="color:var(--muted);font-size:.68rem;opacity:.6">Your balance and transactions stay untouched \u2014 only this backup trail is cleared.</p>' +
       '<div class="ma"><button class="btn btn-ghost-m btn-can">Cancel</button><button class="btn btn-rose btn-cnf">\u{1F5D1} Clear</button></div>';
     const d = await showModal('\u26A0 Clear Logs \u2764', h, () => true);
-    if (d){ saveLogs([]); renderLogs(); toast('Activity log cleared \u2764'); }
+    if (d){ await saveLogs([]); await renderLogs(); toast('Activity log cleared \u2764'); }
   };
 
   console.log('%c\u2665 lovely money \u2665', 'font-size:16px;font-weight:800;color:#ff8fb3');
